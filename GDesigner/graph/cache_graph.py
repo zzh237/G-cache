@@ -56,22 +56,39 @@ class CacheGraph(Graph):
     def store_node_cache(self, node_id: str, cache: Any):
         """Store KV-cache for a node after execution"""
         if self.use_cache_communication:
+            print(f"\n💾 [GRAPH] Storing cache for node {node_id}")
+            print(f"   Cache layers: {len(cache) if cache else 0}")
+            if cache:
+                print(f"   Cache shape: {cache[0][0].shape if len(cache) > 0 else 'N/A'}")
             self.node_caches[node_id] = cache
     
     def get_fused_cache(self, node: Node) -> Optional[Any]:
         """Get fused cache for a node from its spatial predecessors"""
-        if not self.use_cache_communication or not node.spatial_predecessors:
+        print(f"\n🔄 [GRAPH] Getting fused cache for node {node.id}")
+        
+        if not self.use_cache_communication:
+            print(f"   ⚠️ Cache communication disabled")
             return None
+            
+        if not node.spatial_predecessors:
+            print(f"   ℹ️ No spatial predecessors")
+            return None
+        
+        print(f"   Predecessors: {[p.id for p in node.spatial_predecessors]}")
         
         # Collect caches from predecessors
         sharer_caches = []
         edge_weights = []
         for pred in node.spatial_predecessors:
             if pred.id in self.node_caches:
+                print(f"   ✅ Found cache from {pred.id}")
                 sharer_caches.append(self.node_caches[pred.id])
                 edge_weights.append(1.0 / len(node.spatial_predecessors))
+            else:
+                print(f"   ❌ No cache from {pred.id}")
         
         if not sharer_caches:
+            print(f"   ⚠️ No predecessor caches available")
             return None
         
         # Get receiver's own cache (if exists)
@@ -79,7 +96,10 @@ class CacheGraph(Graph):
         
         # Fuse caches
         if receiver_cache is not None:
+            print(f"   🧪 Fusing {len(sharer_caches)} caches with receiver cache")
             return self.cache_fuser(receiver_cache, sharer_caches, edge_weights)
+        
+        print(f"   🔄 Using first sharer cache (no receiver cache yet)")
         return sharer_caches[0]  # Use first sharer if no receiver cache
     
     async def arun(self, input: Dict[str, str], num_rounds: int = 3, 

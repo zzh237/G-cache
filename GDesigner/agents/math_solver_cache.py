@@ -15,8 +15,12 @@ class MathSolverCache(Node):
     def __init__(self, id: str = None, role: str = None, domain: str = "", llm_name: str = ""):
         super().__init__(id, "MathSolverCache", domain, llm_name)
         
-        # Use cache-enabled LLM
-        self.llm = LLMRegistry.get('GPTChatCache', llm_name)
+        # Use cache-enabled LLM (try API version first, fallback to vLLM)
+        try:
+            self.llm = LLMRegistry.get('GPTChatCacheAPI', llm_name)
+        except:
+            self.llm = LLMRegistry.get('GPTChatCache', llm_name)
+        
         self.prompt_set = PromptSetRegistry.get(domain)
         self.role = self.prompt_set.get_role() if role is None else role
         self.constraint = self.prompt_set.get_analyze_constraint(self.role)
@@ -55,6 +59,8 @@ class MathSolverCache(Node):
                             temporal_info: Dict[str, Dict]) -> str:
         """Execute with cache extraction and injection"""
         
+        print(f"\n🤖 [AGENT {self.id}] Executing...")
+        
         # Get graph reference (set by CacheGraph)
         graph = getattr(self, 'graph', None)
         
@@ -68,10 +74,16 @@ class MathSolverCache(Node):
         # Get fused cache from predecessors (if cache enabled)
         past_kv = None
         if graph and hasattr(graph, 'get_fused_cache'):
+            print(f"   🔍 Checking for predecessor caches...")
             past_kv = graph.get_fused_cache(self)
+            if past_kv:
+                print(f"   ✅ Found fused cache from predecessors")
+            else:
+                print(f"   ℹ️ No predecessor cache available")
         
         # Generate with cache
         if hasattr(self.llm, 'agen_with_cache'):
+            print(f"   💬 Generating response with cache support...")
             response, kv_cache = await self.llm.agen_with_cache(
                 messages, 
                 past_key_values=past_kv,
@@ -80,9 +92,12 @@ class MathSolverCache(Node):
             
             # Store cache for other agents to use
             if graph and hasattr(graph, 'store_node_cache'):
+                print(f"   💾 Storing cache for other agents")
                 graph.store_node_cache(self.id, kv_cache)
         else:
             # Fallback to regular generation
+            print(f"   ⚠️ Fallback to regular generation (no cache)")
             response = await self.llm.agen(messages)
         
+        print(f"   ✅ Agent {self.id} completed")
         return response
