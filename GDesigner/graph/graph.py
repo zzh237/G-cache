@@ -121,6 +121,8 @@ class Graph(ABC):
             feature = get_sentence_embedding(profile)
             features.append(feature)
         features = torch.tensor(np.array(features))
+        if features.dim() == 1:
+            features = features.unsqueeze(0)
         return features
     
     def construct_new_features(self, query):
