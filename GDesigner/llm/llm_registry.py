@@ -16,13 +16,17 @@ class LLMRegistry:
         return cls.registry.keys()
 
     @classmethod
-    def get(cls, model_name: Optional[str] = None) -> LLM:
+    def get(cls, model_name: Optional[str] = None, use_cache: bool = False) -> LLM:
         if model_name is None or model_name=="":
             model_name = "gpt-4o"
 
         if model_name == 'mock':
             model = cls.registry.get(model_name)
-        else: # any version of GPTChat like "gpt-4o"
+        elif use_cache:
+            # Use cache-enabled LLM
+            model = cls.registry.get('GPTChatCacheAPI', model_name)
+        else:
+            # Standard LLM
             model = cls.registry.get('GPTChat', model_name)
 
         return model

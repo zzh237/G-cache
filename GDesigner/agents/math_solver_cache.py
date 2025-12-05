@@ -15,11 +15,8 @@ class MathSolverCache(Node):
     def __init__(self, id: str = None, role: str = None, domain: str = "", llm_name: str = ""):
         super().__init__(id, "MathSolverCache", domain, llm_name)
         
-        # Use cache-enabled LLM (try API version first, fallback to vLLM)
-        try:
-            self.llm = LLMRegistry.get('GPTChatCacheAPI', llm_name)
-        except:
-            self.llm = LLMRegistry.get('GPTChatCache', llm_name)
+        # Use cache-enabled LLM
+        self.llm = LLMRegistry.get(llm_name, use_cache=True)
         
         self.prompt_set = PromptSetRegistry.get(domain)
         self.role = self.prompt_set.get_role() if role is None else role
