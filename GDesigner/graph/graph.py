@@ -46,6 +46,7 @@ class Graph(ABC):
                 initial_temporal_probability: float = 0.5,
                 fixed_temporal_masks:List[List[int]] = None,
                 node_kwargs:List[Dict] = None,
+                verbose:bool = False,
                 ):
         
         if fixed_spatial_masks is None:
@@ -63,6 +64,7 @@ class Graph(ABC):
         self.agent_names:List[str] = agent_names
         self.optimized_spatial = optimized_spatial
         self.optimized_temporal = optimized_temporal
+        self.verbose = verbose
         self.decision_node:Node = AgentRegistry.get(decision_method, **{"domain":self.domain,"llm_name":self.llm_name})
         self.nodes:Dict[str,Node] = {}
         self.potential_spatial_edges:List[List[str, str]] = []
@@ -76,7 +78,7 @@ class Graph(ABC):
         self.role_adj_matrix = self.construct_adj_matrix()
         self.features = self.construct_features()
         self.gcn = GCN(self.features.size(1)*2,16,self.features.size(1))
-        self.mlp = MLP(384,16,16)
+        self.mlp = MLP(self.features.size(1),16,16)
 
         init_spatial_logit = torch.log(torch.tensor(initial_spatial_probability / (1 - initial_spatial_probability))) if optimized_spatial else 10.0
         # self.spatial_logits = torch.nn.Parameter(torch.ones(len(self.potential_spatial_edges), requires_grad=optimized_spatial) * init_spatial_logit,
@@ -118,23 +120,47 @@ class Graph(ABC):
         for node_id in self.nodes:
             role = self.nodes[node_id].role
             profile = self.prompt_set.get_description(role)
+            if self.verbose:
+                print(f"[DEBUG] Node {node_id}, Role: {role}, Profile: {profile[:50]}...")
             feature = get_sentence_embedding(profile)
+            if self.verbose:
+                print(f"[DEBUG] Feature shape: {np.array(feature).shape}, Feature sample: {feature[:5] if len(feature) > 0 else 'EMPTY'}")
             features.append(feature)
         features = torch.tensor(np.array(features), dtype=torch.float32)
+        if self.verbose:
+            print(f"[DEBUG] Initial features tensor shape: {features.shape}")
         if features.dim() == 1:
             features = features.unsqueeze(0)
+            if self.verbose:
+                print(f"[DEBUG] After unsqueeze, features shape: {features.shape}")
+        if features.size(-1) == 0:
+            raise ValueError(f"Feature embeddings are empty. Check get_sentence_embedding implementation.")
+        if self.verbose:
+            print(f"[DEBUG] Final features shape: {features.shape}")
         return features
     
     def construct_new_features(self, query):
+        if self.verbose:
+            print(f"[DEBUG] Query: {query[:50]}...")
         query_embedding = get_sentence_embedding(query)
+        if self.verbose:
+            print(f"[DEBUG] Query embedding shape: {np.array(query_embedding).shape}")
         query_embedding = torch.tensor(query_embedding, dtype=torch.float32)
         if query_embedding.dim() == 0:
             query_embedding = query_embedding.unsqueeze(0)
         if query_embedding.dim() == 1:
             query_embedding = query_embedding.unsqueeze(0)
         num_nodes = self.features.size(0)
+        if self.verbose:
+            print(f"[DEBUG] Query embedding after reshape: {query_embedding.shape}")
+            print(f"[DEBUG] Repeating for {num_nodes} nodes")
         query_embedding = query_embedding.repeat((num_nodes, 1))
+        if self.verbose:
+            print(f"[DEBUG] Query embedding after repeat: {query_embedding.shape}")
+            print(f"[DEBUG] self.features shape: {self.features.shape}")
         new_features = torch.cat((self.features, query_embedding), dim=1)
+        if self.verbose:
+            print(f"[DEBUG] new_features shape: {new_features.shape}")
         return new_features
         
     @property
