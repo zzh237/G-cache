@@ -149,7 +149,13 @@ class Graph(ABC):
                 print(f"[DEBUG] After unsqueeze, features shape: {features.shape}")
         
         if features.size(-1) == 0:
-            raise ValueError(f"Feature embeddings are empty. Features shape: {features.shape}. Check get_sentence_embedding implementation or profile descriptions.")
+            print(f"[ERROR] Feature embeddings are empty!")
+            print(f"[ERROR] Features shape: {features.shape}")
+            print(f"[ERROR] Number of nodes: {len(self.nodes)}")
+            print(f"[ERROR] Features list length: {len(features)}")
+            if len(features) > 0:
+                print(f"[ERROR] First feature sample: {features[0] if len(features) > 0 else 'N/A'}")
+            raise ValueError(f"Feature embeddings are empty. Features shape: {features.shape}. Nodes: {len(self.nodes)}. Check get_sentence_embedding implementation or profile descriptions.")
         
         if self.verbose:
             print(f"[DEBUG] Final features shape: {features.shape}")
