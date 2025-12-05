@@ -120,14 +120,14 @@ class Graph(ABC):
             profile = self.prompt_set.get_description(role)
             feature = get_sentence_embedding(profile)
             features.append(feature)
-        features = torch.tensor(np.array(features))
+        features = torch.tensor(np.array(features), dtype=torch.float32)
         if features.dim() == 1:
             features = features.unsqueeze(0)
         return features
     
     def construct_new_features(self, query):
         query_embedding = get_sentence_embedding(query)
-        query_embedding = torch.tensor(query_embedding)
+        query_embedding = torch.tensor(query_embedding, dtype=torch.float32)
         if query_embedding.dim() == 0:
             query_embedding = query_embedding.unsqueeze(0)
         if query_embedding.dim() == 1:
