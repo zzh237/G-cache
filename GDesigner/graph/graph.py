@@ -232,12 +232,21 @@ class Graph(ABC):
         """
         Creates and adds new nodes to the graph.
         """
+        if self.verbose:
+            print(f"[DEBUG] Initializing nodes with agent_names: {self.agent_names}")
+            print(f"[DEBUG] Available agents in registry: {list(AgentRegistry.registry.keys())}")
         for agent_name,kwargs in zip(self.agent_names,self.node_kwargs):
             if agent_name in AgentRegistry.registry:
                 kwargs["domain"] = self.domain
                 kwargs["llm_name"] = self.llm_name
                 agent_instance = AgentRegistry.get(agent_name, **kwargs)
                 self.add_node(agent_instance)
+                if self.verbose:
+                    print(f"[DEBUG] Added node for agent: {agent_name}")
+            else:
+                print(f"[ERROR] Agent '{agent_name}' not found in AgentRegistry. Available: {list(AgentRegistry.registry.keys())}")
+        if self.verbose:
+            print(f"[DEBUG] Total nodes added: {len(self.nodes)}")
     
     def init_potential_edges(self):
         """
