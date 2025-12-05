@@ -130,3 +130,7 @@ class GPTChatCacheAPI(LLM):
         """Standard generation without cache (for compatibility)"""
         text, _ = await self.agen_with_cache(messages, **kwargs)
         return text
+    
+    def gen(self, messages: List[Message], **kwargs) -> str:
+        """Sync generation (not used, raises error)"""
+        raise NotImplementedError("Use async agen() or agen_with_cache() instead")
