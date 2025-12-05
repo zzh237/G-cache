@@ -116,25 +116,41 @@ class Graph(ABC):
         return edge_index
     
     def construct_features(self):
+        if self.verbose or len(self.nodes) == 0:
+            print(f"[DEBUG] Number of nodes: {len(self.nodes)}")
+        
+        if len(self.nodes) == 0:
+            raise ValueError("No nodes in graph. Cannot construct features.")
+        
         features = []
         for node_id in self.nodes:
             role = self.nodes[node_id].role
             profile = self.prompt_set.get_description(role)
             if self.verbose:
-                print(f"[DEBUG] Node {node_id}, Role: {role}, Profile: {profile[:50]}...")
+                print(f"[DEBUG] Node {node_id}, Role: {role}")
+                print(f"[DEBUG] Profile: {profile if profile else 'EMPTY PROFILE'}")
+            
+            if not profile or profile.strip() == "":
+                print(f"[WARNING] Empty profile for node {node_id} with role {role}")
+                profile = f"Agent with role {role}"  # Fallback
+            
             feature = get_sentence_embedding(profile)
             if self.verbose:
                 print(f"[DEBUG] Feature shape: {np.array(feature).shape}, Feature sample: {feature[:5] if len(feature) > 0 else 'EMPTY'}")
             features.append(feature)
+        
         features = torch.tensor(np.array(features), dtype=torch.float32)
         if self.verbose:
             print(f"[DEBUG] Initial features tensor shape: {features.shape}")
+        
         if features.dim() == 1:
             features = features.unsqueeze(0)
             if self.verbose:
                 print(f"[DEBUG] After unsqueeze, features shape: {features.shape}")
+        
         if features.size(-1) == 0:
-            raise ValueError(f"Feature embeddings are empty. Check get_sentence_embedding implementation.")
+            raise ValueError(f"Feature embeddings are empty. Features shape: {features.shape}. Check get_sentence_embedding implementation or profile descriptions.")
+        
         if self.verbose:
             print(f"[DEBUG] Final features shape: {features.shape}")
         return features
