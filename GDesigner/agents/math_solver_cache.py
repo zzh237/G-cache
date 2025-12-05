@@ -1,7 +1,8 @@
 """
-Cache-enabled Math Solver Agent - Actually uses cache communication
+Cache-enabled Math Solver Agent - Combines GDesigner graph with LatentMAS cache
+Novel contribution: Graph-guided multi-agent KV-cache communication
 """
-from typing import List, Any, Dict
+from typing import List, Any, Dict, Optional, Tuple
 from GDesigner.graph.node import Node
 from GDesigner.agents.agent_registry import AgentRegistry
 from GDesigner.llm.llm_registry import LLMRegistry
@@ -10,9 +11,20 @@ from GDesigner.prompt.prompt_set_registry import PromptSetRegistry
 
 @AgentRegistry.register('MathSolverCache')
 class MathSolverCache(Node):
-    """Math solver that uses cache communication"""
+    """
+    Math solver with dual-channel communication:
+    1. Text channel: GDesigner's spatial/temporal graph structure
+    2. Latent channel: LatentMAS's KV-cache sharing
     
-    def __init__(self, id: str = None, role: str = None, domain: str = "", llm_name: str = ""):
+    Key innovation: Graph topology guides which caches to fuse
+    """
+    
+    def __init__(self, id: str = None, role: str = None, domain: str = "", llm_name: str = "",
+                 cache_mode: str = "hybrid"):
+        """
+        Args:
+            cache_mode: "hybrid" (text+cache), "latent_only" (cache only), "text_only" (no cache)
+        """
         super().__init__(id, "MathSolverCache", domain, llm_name)
         
         # Use cache-enabled LLM
@@ -20,30 +32,55 @@ class MathSolverCache(Node):
         
         self.prompt_set = PromptSetRegistry.get(domain)
         self.role = self.prompt_set.get_role() if role is None else role
-        self.constraint = self.prompt_set.get_analyze_constraint(self.role)
+        self.constraint = self.prompt_set.get_constraint(self.role)
+        
+        # Cache communication mode
+        self.cache_mode = cache_mode  # "hybrid", "latent_only", "text_only"
     
-    async def _process_inputs(self, raw_inputs: Dict[str, str], 
-                             spatial_info: Dict[str, Dict], 
-                             temporal_info: Dict[str, Dict]) -> tuple:
-        """Process inputs into system and user prompts"""
-        system_prompt = f"{self.constraint}"
-        user_prompt = f"The task is: {raw_inputs['task']}\n"
+    def _process_inputs(self, raw_inputs: Dict[str, str], 
+                       spatial_info: Dict[str, Dict], 
+                       temporal_info: Dict[str, Dict],
+                       has_cache: bool = False) -> tuple:
+        """Process inputs with cache-aware prompting"""
+        system_prompt = self.constraint
+        user_prompt = self.prompt_set.get_answer_prompt(question=raw_inputs["task"], role=self.role)
         
-        # Add spatial info (from other agents in same round)
-        spatial_str = ""
-        for id, info in spatial_info.items():
-            spatial_str += f"Agent {id} ({info['role']}): {info['output']}\n\n"
+        # Hybrid mode: Use both text and cache
+        if self.cache_mode == "hybrid":
+            # Add text info from graph structure
+            spatial_str = ""
+            temporal_str = ""
+            for id, info in spatial_info.items():
+                spatial_str += f"Agent {id} as a {info['role']} his answer to this question is:\n\n{info['output']}\n\n"
+            for id, info in temporal_info.items():
+                temporal_str += f"Agent {id} as a {info['role']} his answer to this question was:\n\n{info['output']}\n\n"
+            
+            if spatial_str:
+                user_prompt += f"\n\nSpatial context (same round):\n{spatial_str}"
+            if temporal_str:
+                user_prompt += f"\n\nTemporal context (previous rounds):\n{temporal_str}"
+            
+            # Indicate cache availability
+            if has_cache:
+                user_prompt += "\n\n[Note: Latent representations from predecessor agents are also available in KV-cache]"
         
-        if spatial_str:
-            user_prompt += f"\nOther agents' outputs:\n{spatial_str}"
+        # Latent-only mode: Minimal text, rely on cache
+        elif self.cache_mode == "latent_only":
+            if has_cache:
+                user_prompt += "\n\n[Using latent context from predecessor agents via KV-cache]"
+            # Don't add text from other agents
         
-        # Add temporal info (from previous rounds)
-        temporal_str = ""
-        for id, info in temporal_info.items():
-            temporal_str += f"Agent {id} ({info['role']}): {info['output']}\n\n"
-        
-        if temporal_str:
-            user_prompt += f"\nPrevious round outputs:\n{temporal_str}"
+        # Text-only mode: Traditional GDesigner (fallback)
+        else:  # text_only
+            spatial_str = ""
+            temporal_str = ""
+            for id, info in spatial_info.items():
+                spatial_str += f"Agent {id} as a {info['role']} his answer to this question is:\n\n{info['output']}\n\n"
+            for id, info in temporal_info.items():
+                temporal_str += f"Agent {id} as a {info['role']} his answer to this question was:\n\n{info['output']}\n\n"
+            
+            user_prompt += f"At the same time, there are the following responses to the same question for your reference:\n\n{spatial_str} \n\n" if len(spatial_str) else ""
+            user_prompt += f"In the last round of dialogue, there were the following responses to the same question for your reference: \n\n{temporal_str}" if len(temporal_str) else ""
         
         return system_prompt, user_prompt
     
@@ -51,50 +88,56 @@ class MathSolverCache(Node):
         """Sync execution (not used in async mode)"""
         raise NotImplementedError("Use async_execute instead")
     
+
+
     async def _async_execute(self, input: Dict[str, str], 
                             spatial_info: Dict[str, Dict], 
                             temporal_info: Dict[str, Dict]) -> str:
-        """Execute with cache extraction and injection"""
+        """
+        Execute with graph-guided cache fusion
         
-        print(f"\n🤖 [AGENT {self.id}] Executing...")
-        
-        # Get graph reference (set by CacheGraph)
+        Novel contribution: Uses graph topology to determine cache fusion strategy
+        - Spatial predecessors: Fuse their caches (parallel reasoning)
+        - Temporal predecessors: Include their caches (sequential refinement)
+        """
+        # Get graph reference for cache communication
         graph = getattr(self, 'graph', None)
         
-        # Prepare messages
-        system_prompt, user_prompt = await self._process_inputs(input, spatial_info, temporal_info)
-        messages = [
-            {'role': 'system', 'content': system_prompt},
-            {'role': 'user', 'content': user_prompt}
-        ]
-        
-        # Get fused cache from predecessors (if cache enabled)
+        # Graph-guided cache retrieval
         past_kv = None
-        if graph and hasattr(graph, 'get_fused_cache'):
-            print(f"   🔍 Checking for predecessor caches...")
+        has_cache = False
+        if graph and hasattr(graph, 'get_fused_cache') and self.cache_mode != "text_only":
             past_kv = graph.get_fused_cache(self)
-            if past_kv:
-                print(f"   ✅ Found fused cache from predecessors")
-            else:
-                print(f"   ℹ️ No predecessor cache available")
+            has_cache = past_kv is not None
+            
+            if has_cache and self.verbose:
+                print(f"[{self.id}] Using fused cache from {len(self.spatial_predecessors)} spatial + {len(self.temporal_predecessors)} temporal predecessors")
         
-        # Generate with cache
-        if hasattr(self.llm, 'agen_with_cache'):
-            print(f"   💬 Generating response with cache support...")
+        # Process inputs with cache awareness
+        system_prompt, user_prompt = self._process_inputs(input, spatial_info, temporal_info, has_cache)
+        messages = [{'role': 'system', 'content': system_prompt}, {'role': 'user', 'content': user_prompt}]
+        
+        # Generate with cache if supported
+        if hasattr(self.llm, 'agen_with_cache') and self.cache_mode != "text_only":
+            # Use cache-enabled generation
             response, kv_cache = await self.llm.agen_with_cache(
                 messages, 
                 past_key_values=past_kv,
-                latent_steps=10
+                latent_steps=10  # LatentMAS-style latent reasoning steps
             )
             
-            # Store cache for other agents to use
+            # Store cache for downstream agents (graph-guided sharing)
             if graph and hasattr(graph, 'store_node_cache'):
-                print(f"   💾 Storing cache for other agents")
                 graph.store_node_cache(self.id, kv_cache)
+                if self.verbose:
+                    print(f"[{self.id}] Stored cache for {len(self.spatial_successors)} spatial + {len(self.temporal_successors)} temporal successors")
         else:
-            # Fallback to regular generation
-            print(f"   ⚠️ Fallback to regular generation (no cache)")
+            # Fallback to text-only generation
             response = await self.llm.agen(messages)
         
-        print(f"   ✅ Agent {self.id} completed")
         return response
+    
+    @property
+    def verbose(self):
+        """Check if verbose mode is enabled"""
+        return getattr(self, '_verbose', False)

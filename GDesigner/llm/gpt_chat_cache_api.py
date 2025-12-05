@@ -126,11 +126,17 @@ class GPTChatCacheAPI(LLM):
         
         return text, kv_cache
     
-    async def agen(self, messages: List[Message], **kwargs) -> str:
+    async def agen(self, messages: List[Message], 
+                   max_tokens: Optional[int] = None,
+                   temperature: Optional[float] = None,
+                   num_comps: Optional[int] = None) -> Union[List[str], str]:
         """Standard generation without cache (for compatibility)"""
-        text, _ = await self.agen_with_cache(messages, **kwargs)
+        text, _ = await self.agen_with_cache(messages)
         return text
     
-    def gen(self, messages: List[Message], **kwargs) -> str:
+    def gen(self, messages: List[Message],
+            max_tokens: Optional[int] = None,
+            temperature: Optional[float] = None,
+            num_comps: Optional[int] = None) -> Union[List[str], str]:
         """Sync generation (not used, raises error)"""
         raise NotImplementedError("Use async agen() or agen_with_cache() instead")
