@@ -126,12 +126,14 @@ class Graph(ABC):
         return features
     
     def construct_new_features(self, query):
-        query_embedding = torch.tensor(get_sentence_embedding(query))
+        query_embedding = get_sentence_embedding(query)
+        query_embedding = torch.tensor(query_embedding)
         if query_embedding.dim() == 0:
             query_embedding = query_embedding.unsqueeze(0)
         if query_embedding.dim() == 1:
             query_embedding = query_embedding.unsqueeze(0)
-        query_embedding = query_embedding.repeat((self.num_nodes, 1))
+        num_nodes = self.features.size(0)
+        query_embedding = query_embedding.repeat((num_nodes, 1))
         new_features = torch.cat((self.features, query_embedding), dim=1)
         return new_features
         
