@@ -101,11 +101,16 @@ class GPTChatCacheAPI(LLM):
         """
         print(f"\n📦 [CACHE] agen_with_cache called")
         
-        # Convert messages
+        # Convert messages to dict format
         if isinstance(messages, str):
             messages = [{"role": "user", "content": messages}]
-        else:
-            messages = [{"role": m.role, "content": m.content} for m in messages]
+        elif isinstance(messages, list) and len(messages) > 0:
+            if isinstance(messages[0], dict):
+                # Already in dict format
+                pass
+            else:
+                # Convert Message objects to dicts
+                messages = [{"role": m.role, "content": m.content} for m in messages]
         
         # Add cache info to prompt if available (text-based cache simulation)
         if past_key_values is not None:

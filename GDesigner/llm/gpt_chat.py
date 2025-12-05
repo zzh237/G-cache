@@ -23,25 +23,21 @@ MINE_API_KEYS = os.getenv('API_KEY')
 async def achat(
     model: str,
     msg: List[Dict],):
-    request_url = MINE_BASE_URL
-    authorization_key = MINE_API_KEYS
+    request_url = f"{MINE_BASE_URL}/chat/completions"
     headers = {
         'Content-Type': 'application/json',
-        'authorization': authorization_key
+        'Authorization': f'Bearer {MINE_API_KEYS}'
     }
     data = {
-        "name": model,
-        "inputs": {
-            "stream": False,
-            "msg": repr(msg),
-        }
+        "model": model,
+        "messages": msg,
+        "stream": False,
     }
     async with aiohttp.ClientSession() as session:
-        async with session.post(request_url, headers=headers ,json=data) as response:
+        async with session.post(request_url, headers=headers, json=data) as response:
             response_data = await response.json()
-            prompt = "".join([item['content'] for item in msg])
-            cost_count(prompt,response_data['data'],model)
-            return response_data['data']
+            text = response_data['choices'][0]['message']['content']
+            return text
 
 @LLMRegistry.register('GPTChat')
 class GPTChat(LLM):
@@ -64,9 +60,18 @@ class GPTChat(LLM):
         if num_comps is None:
             num_comps = self.DEFUALT_NUM_COMPLETIONS
         
+        # Convert to dict format
         if isinstance(messages, str):
-            messages = [Message(role="user", content=messages)]
-        return await achat(self.model_name,messages)
+            msg_dicts = [{"role": "user", "content": messages}]
+        elif isinstance(messages, list) and len(messages) > 0:
+            if isinstance(messages[0], dict):
+                msg_dicts = messages
+            else:
+                msg_dicts = [{"role": m.role, "content": m.content} for m in messages]
+        else:
+            msg_dicts = messages
+            
+        return await achat(self.model_name, msg_dicts)
     
     def gen(
         self,
