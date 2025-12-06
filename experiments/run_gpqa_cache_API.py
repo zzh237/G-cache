@@ -14,7 +14,17 @@ from pathlib import Path
 import torch
 import copy
 from typing import List
-import datasets as hf_datasets
+
+# Import from HuggingFace datasets library (not local datasets folder)
+try:
+    from datasets import load_dataset as hf_load_dataset
+except ImportError:
+    import sys
+    # Remove local datasets from path temporarily
+    datasets_path = os.path.join(os.path.dirname(__file__), 'datasets')
+    if datasets_path in sys.path:
+        sys.path.remove(datasets_path)
+    from datasets import load_dataset as hf_load_dataset
 
 from GDesigner.utils.const import GDesigner_ROOT
 from GDesigner.graph.cache_graph import CacheGraph
@@ -32,7 +42,7 @@ def normalize_answer(ans: str) -> str:
 
 def load_gpqa(split: str = "test") -> List[dict]:
     """Load GPQA Diamond dataset from HuggingFace cache"""
-    ds = hf_datasets.load_dataset("fingertap/GPQA-Diamond", split=split)
+    ds = hf_load_dataset("fingertap/GPQA-Diamond", split=split)
     
     processed = []
     for item in ds:
