@@ -4,9 +4,12 @@ Tests graph-guided KV-cache on graduate-level science multiple choice questions
 """
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+# Import HuggingFace datasets BEFORE adding local paths
 from datasets import load_dataset
+
+# Now add local paths (for GDesigner imports)
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import argparse
 import json
@@ -20,8 +23,6 @@ from typing import List
 from GDesigner.utils.const import GDesigner_ROOT
 from GDesigner.graph.cache_graph import CacheGraph
 from GDesigner.utils.globals import Time
-
-# Import local modules
 from run_gsm8k import load_result, dataloader, get_kwargs
 
 
