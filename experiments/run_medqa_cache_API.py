@@ -36,8 +36,12 @@ def load_medqa(json_path: str) -> List[dict]:
         
         # Format question with options
         task = f"{question}\n\nOptions:\n"
-        for key in sorted(options.keys()):
-            task += f"{key}. {options[key]}\n"
+        if isinstance(options, dict):
+            for key in sorted(options.keys()):
+                task += f"{key}. {options[key]}\n"
+        elif isinstance(options, list):
+            for i, opt in enumerate(options):
+                task += f"{chr(65+i)}. {opt}\n"
         
         processed.append({
             'task': task.strip(),
