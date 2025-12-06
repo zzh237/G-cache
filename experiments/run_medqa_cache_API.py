@@ -78,7 +78,7 @@ def extract_medqa_answer(response: str) -> str:
 def parse_args():
     parser = argparse.ArgumentParser(description="CacheDesigner for MedQA")
     parser.add_argument("--dataset_json", type=str, 
-                       default="datasets/LatentMAS/data/medqa.json")
+                       default="../datasets/LatentMAS/medqa.json")
     parser.add_argument("--llm_name", type=str, default="qwen-plus")
     parser.add_argument('--mode', type=str, default='FullConnected')
     parser.add_argument('--lr', type=float, default=0.1)
