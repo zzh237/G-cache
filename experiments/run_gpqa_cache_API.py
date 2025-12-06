@@ -4,9 +4,19 @@ Tests graph-guided KV-cache on graduate-level science multiple choice questions
 """
 import sys
 import os
+import importlib.util
 
-# CRITICAL: Import HuggingFace datasets BEFORE adding local paths
-from datasets import load_dataset as hf_load_dataset
+# Import HuggingFace datasets using importlib to bypass local datasets folder
+spec = importlib.util.find_spec('datasets')
+if spec and 'site-packages' in spec.origin:
+    import datasets
+    hf_load_dataset = datasets.load_dataset
+else:
+    # Fallback: manipulate sys.path
+    original_path = sys.path.copy()
+    sys.path = [p for p in sys.path if 'experiments' not in p]
+    from datasets import load_dataset as hf_load_dataset
+    sys.path = original_path
 
 # Now add local paths
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -24,6 +34,7 @@ from GDesigner.utils.const import GDesigner_ROOT
 from GDesigner.graph.cache_graph import CacheGraph
 from GDesigner.utils.globals import Time
 
+# Import local modules
 from run_gsm8k import load_result, dataloader, get_kwargs
 
 
