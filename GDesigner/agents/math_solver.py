@@ -5,6 +5,12 @@ from GDesigner.agents.agent_registry import AgentRegistry
 from GDesigner.llm.llm_registry import LLMRegistry
 from GDesigner.prompt.prompt_set_registry import PromptSetRegistry
 from GDesigner.tools.coding.python_executor import execute_code_get_return
+import sys
+import os
+# Add G-cache root path to import datasets
+gcache_root = os.path.join(os.path.dirname(__file__), '..', '..')
+if gcache_root not in sys.path:
+    sys.path.insert(0, gcache_root)
 from datasets.gsm8k_dataset import gsm_get_predict
 
 @AgentRegistry.register('MathSolver')

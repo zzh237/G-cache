@@ -4,21 +4,9 @@ Tests graph-guided KV-cache on graduate-level science multiple choice questions
 """
 import sys
 import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# Add experiments path first for local datasets module
-experiments_path = os.path.dirname(__file__)
-if experiments_path not in sys.path:
-    sys.path.insert(0, experiments_path)
-
-# Add parent path for GDesigner
-parent_path = os.path.abspath(os.path.join(experiments_path, '..'))
-if parent_path not in sys.path:
-    sys.path.insert(0, parent_path)
-
-# Import HuggingFace datasets with explicit package name
-import importlib
-hf_datasets = importlib.import_module('datasets')
-hf_load_dataset = hf_datasets.load_dataset
+from datasets import load_dataset
 
 import argparse
 import json
@@ -46,7 +34,7 @@ def normalize_answer(ans: str) -> str:
 
 def load_gpqa(split: str = "test") -> List[dict]:
     """Load GPQA Diamond dataset from HuggingFace cache"""
-    ds = hf_load_dataset("fingertap/GPQA-Diamond", split=split)
+    ds = load_dataset("fingertap/GPQA-Diamond", split=split)
     
     processed = []
     for item in ds:
