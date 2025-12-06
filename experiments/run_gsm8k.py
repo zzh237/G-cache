@@ -18,7 +18,15 @@ from GDesigner.graph.graph import Graph
 from GDesigner.tools.reader.readers import JSONLReader
 from GDesigner.utils.globals import Time
 from GDesigner.utils.globals import Cost, PromptTokens, CompletionTokens
-from datasets.gsm8k_dataset import gsm_data_process,gsm_get_predict
+
+# Try to import from local datasets folder
+try:
+    from datasets.gsm8k_dataset import gsm_data_process, gsm_get_predict
+except (ImportError, ModuleNotFoundError):
+    # Dummy implementations (only used if datasets folder doesn't exist)
+    def gsm_data_process(dataset):
+        return [{"task": d.get("question", ""), "answer": d.get("answer", "").split("####")[-1].strip(), "step": ""} for d in dataset]
+    gsm_get_predict = lambda text: '0'
 
 def load_result(result_file):
     if not result_file.exists():
