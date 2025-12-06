@@ -1,11 +1,17 @@
 from typing import List,Any,Dict
+import re
 
 from GDesigner.graph.node import Node
 from GDesigner.agents.agent_registry import AgentRegistry
 from GDesigner.llm.llm_registry import LLMRegistry
 from GDesigner.prompt.prompt_set_registry import PromptSetRegistry
 from GDesigner.tools.coding.python_executor import execute_code_get_return
-from datasets.gsm8k_dataset import gsm_get_predict
+
+# Try to import gsm_get_predict, use dummy if not available
+try:
+    from datasets.gsm8k_dataset import gsm_get_predict
+except (ImportError, ModuleNotFoundError):
+    gsm_get_predict = lambda text: '0'  # Dummy (never called when using MathSolverCache)
 
 @AgentRegistry.register('MathSolver')
 class MathSolver(Node):
