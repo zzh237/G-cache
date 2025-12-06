@@ -14,7 +14,7 @@ from pathlib import Path
 import torch
 import copy
 from typing import List
-from datasets import load_dataset
+import datasets as hf_datasets
 
 from GDesigner.utils.const import GDesigner_ROOT
 from GDesigner.graph.cache_graph import CacheGraph
@@ -32,7 +32,7 @@ def normalize_answer(ans: str) -> str:
 
 def load_gpqa(split: str = "test") -> List[dict]:
     """Load GPQA Diamond dataset from HuggingFace cache"""
-    ds = load_dataset("fingertap/GPQA-Diamond", split=split)
+    ds = hf_datasets.load_dataset("fingertap/GPQA-Diamond", split=split)
     
     processed = []
     for item in ds:
