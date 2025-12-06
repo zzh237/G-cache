@@ -23,28 +23,31 @@ from run_gsm8k import load_result, dataloader, get_kwargs
 
 
 def load_medqa(json_path: str) -> List[dict]:
-    """Load MedQA dataset from JSON file"""
+    """Load MedQA dataset from JSON file - matches LatentMAS format"""
     with open(json_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
     
-    # Convert to standard format
+    # Convert to standard format matching LatentMAS
     processed = []
     for item in data:
-        question = item.get('question', '')
-        options = item.get('options', {})
-        answer = item.get('answer', '')
+        question = item.get('query', '')
+        raw_answer = str(item.get('answer', ''))
+        options = item.get('options', [])
         
-        # Format question with options
-        task = f"{question}\n\nOptions:\n"
-        if isinstance(options, dict):
-            for key in sorted(options.keys()):
-                task += f"{key}. {options[key]}\n"
-        elif isinstance(options, list):
-            for i, opt in enumerate(options):
-                task += f"{chr(65+i)}. {opt}\n"
+        # Map answer index to letter (matching LatentMAS)
+        choice_map = {"0": "A", "1": "B", "2": "C", "3": "D"}
+        answer = ""
+        
+        for idx, op in enumerate(options):
+            if raw_answer in op:
+                answer = choice_map[str(idx)].lower()
+                break
+        
+        # Normalize answer to lowercase
+        answer = normalize_answer(answer)
         
         processed.append({
-            'task': task.strip(),
+            'task': question,
             'answer': answer,
             'options': options
         })
@@ -52,29 +55,42 @@ def load_medqa(json_path: str) -> List[dict]:
     return processed
 
 
+def normalize_answer(ans: str) -> str:
+    """Normalize answer to lowercase - matches LatentMAS"""
+    if ans is None:
+        return ""
+    return ans.strip().lower()
+
+
 def extract_medqa_answer(response: str) -> str:
-    """Extract answer (A/B/C/D) from response"""
-    response = response.upper()
-    # Look for boxed answer
-    if '\\boxed{' in response:
-        start = response.find('\\boxed{') + 7
-        end = response.find('}', start)
-        if end > start:
-            answer = response[start:end].strip()
-            if answer in ['A', 'B', 'C', 'D']:
-                return answer
+    """Extract answer (A/B/C/D) from response - matches LatentMAS evaluation"""
+    if not response:
+        return ""
     
-    # Look for explicit answer statement
-    for line in response.split('\n'):
-        if 'answer is' in line.lower() or 'answer:' in line.lower():
+    response_upper = response.upper()
+    
+    # Look for "The answer is X" pattern (most common)
+    if 'THE ANSWER IS' in response_upper:
+        idx = response_upper.rfind('THE ANSWER IS')
+        after = response_upper[idx+13:idx+20]
+        for char in ['A', 'B', 'C', 'D']:
+            if char in after:
+                return normalize_answer(char)
+    
+    # Look for "answer is X" or "Answer: X"
+    for pattern in ['ANSWER IS', 'ANSWER:']:
+        if pattern in response_upper:
+            idx = response_upper.rfind(pattern)
+            after = response_upper[idx+len(pattern):idx+len(pattern)+10]
             for char in ['A', 'B', 'C', 'D']:
-                if char in line:
-                    return char
+                if char in after:
+                    return normalize_answer(char)
     
-    # Last resort: find first A/B/C/D
+    # Look in last 100 characters for A/B/C/D
+    last_part = response_upper[-100:]
     for char in ['A', 'B', 'C', 'D']:
-        if char in response:
-            return char
+        if char in last_part:
+            return normalize_answer(char)
     
     return ""
 
