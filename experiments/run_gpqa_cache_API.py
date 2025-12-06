@@ -4,22 +4,21 @@ Tests graph-guided KV-cache on graduate-level science multiple choice questions
 """
 import sys
 import os
-import importlib.util
 
-# Import HuggingFace datasets using importlib to bypass local datasets folder
-spec = importlib.util.find_spec('datasets')
-if spec and 'site-packages' in spec.origin:
-    import datasets
-    hf_load_dataset = datasets.load_dataset
-else:
-    # Fallback: manipulate sys.path
-    original_path = sys.path.copy()
-    sys.path = [p for p in sys.path if 'experiments' not in p]
-    from datasets import load_dataset as hf_load_dataset
-    sys.path = original_path
+# Add experiments path first for local datasets module
+experiments_path = os.path.dirname(__file__)
+if experiments_path not in sys.path:
+    sys.path.insert(0, experiments_path)
 
-# Now add local paths
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Add parent path for GDesigner
+parent_path = os.path.abspath(os.path.join(experiments_path, '..'))
+if parent_path not in sys.path:
+    sys.path.insert(0, parent_path)
+
+# Import HuggingFace datasets with explicit package name
+import importlib
+hf_datasets = importlib.import_module('datasets')
+hf_load_dataset = hf_datasets.load_dataset
 
 import argparse
 import json
