@@ -218,3 +218,8 @@ python run_gsm8k_cache_API.py --use_cache --optimized_spatial
 ```
 
 **That's it!** 🎉
+
+
+**Add data set**
+
+python -c "from data import load_gpqa_diamond; list(load_gpqa_diamond(split='test'))"
