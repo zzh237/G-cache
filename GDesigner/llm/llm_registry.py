@@ -20,11 +20,14 @@ class LLMRegistry:
         if model_name is None or model_name=="":
             model_name = "gpt-4o"
 
-        if model_name == 'mock':
+        # Check if model_name is directly registered (e.g., 'hybrid_cache', 'qwen-plus')
+        if model_name in cls.registry.keys():
+            model = cls.registry.get(model_name)
+        elif model_name == 'mock':
             model = cls.registry.get(model_name)
         elif use_cache:
-            # Use cache-enabled LLM
-            model = cls.registry.get('GPTChatCacheAPI', model_name)
+            # Fallback: try to use cache-enabled wrapper (legacy)
+            model = cls.registry.get('GPTChat', model_name)
         else:
             # Standard LLM
             model = cls.registry.get('GPTChat', model_name)
