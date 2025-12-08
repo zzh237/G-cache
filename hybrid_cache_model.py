@@ -7,6 +7,10 @@ import os
 from typing import List, Dict, Tuple, Optional
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from openai import AsyncOpenAI
+from dotenv import load_dotenv
+
+# Load .env file
+load_dotenv()
 
 
 class HybridCacheModel:
@@ -55,8 +59,13 @@ class HybridCacheModel:
             ).to(self.device).eval()
         
         # API client for text generation
+        # Use API_KEY from .env (supports both names for compatibility)
+        api_key = os.getenv("API_KEY") or os.getenv("DASHSCOPE_API_KEY")
+        if not api_key:
+            raise ValueError("API key not found! Set API_KEY in .env file")
+        
         self.api_client = AsyncOpenAI(
-            api_key=os.getenv("DASHSCOPE_API_KEY"),
+            api_key=api_key,
             base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
         )
         self.api_model_name = api_model_name

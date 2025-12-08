@@ -178,7 +178,7 @@ optimizer = torch.optim.Adam(params, lr=0.1)
 ### Mode 1: Hybrid (RECOMMENDED) ✅
 
 ```bash
-export DASHSCOPE_API_KEY="your_key"
+# API key loaded from .env automatically!
 python run_gsm8k_cache_API.py --llm_name hybrid_cache --use_cache
 ```
 
@@ -207,11 +207,19 @@ python run_gsm8k_cache_API.py --llm_name local_cache --use_cache
 ## 🔧 Setup
 
 ```bash
+# 1. Install dependencies
 pip install torch transformers openai python-dotenv
-export DASHSCOPE_API_KEY="your_key"
+
+# 2. Set API key in .env file (already done!)
+# Just edit .env:
+# API_KEY=your_dashscope_api_key
+
+# 3. Run (no export needed!)
 cd experiments
 python run_gsm8k_cache_API.py --llm_name hybrid_cache --use_cache
 ```
+
+**Note**: The code automatically loads `API_KEY` from `.env` - no need to export anything!
 
 ---
 
