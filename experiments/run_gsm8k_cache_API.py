@@ -45,8 +45,11 @@ def parse_args():
     parser.add_argument('--decision_method', type=str, default='FinalRefer')
     parser.add_argument('--optimized_spatial', type=bool, default=True, help='Enable spatial optimization (required for cache training)')
     
-    # Cache arguments (simulated)
-    parser.add_argument('--use_cache', action='store_true', help='Enable simulated cache')
+    # Cache arguments
+    parser.add_argument('--use_cache', action='store_true', help='Enable cache')
+    parser.add_argument('--generation_mode', type=str, default='api_hint', 
+                        choices=['api_hint', 'hybrid', 'local'],
+                        help='Generation mode: api_hint (API with text hint), hybrid (local+API), local (local only)')
     parser.add_argument('--hidden_dim', type=int, default=4096)
     parser.add_argument('--num_cache_layers', type=int, default=32)
     
@@ -91,6 +94,18 @@ async def main():
     
     kwargs = get_kwargs(args.mode, len(agent_names))
     
+    # Set generation mode
+    if args.use_cache:
+        if args.generation_mode == 'hybrid':
+            print(f"⭐ Generation mode: HYBRID (local model + API refinement)")
+        elif args.generation_mode == 'local':
+            print(f"🖥️  Generation mode: LOCAL (local model only, real cache)")
+        else:  # api_hint
+            print(f"🌐 Generation mode: API_HINT (API with text hint)")
+        node_kwargs = [{"generation_mode": args.generation_mode} for _ in agent_names]
+    else:
+        node_kwargs = [{} for _ in agent_names]
+    
     # Create CacheGraph
     graph = CacheGraph(
         domain="gsm8k",
@@ -102,6 +117,7 @@ async def main():
         use_cache_communication=args.use_cache,
         hidden_dim=args.hidden_dim,
         num_cache_layers=args.num_cache_layers,
+        node_kwargs=node_kwargs,
         **kwargs
     )
     

@@ -20,10 +20,11 @@ class MathSolverCache(Node):
     """
     
     def __init__(self, id: str = None, role: str = None, domain: str = "", llm_name: str = "",
-                 cache_mode: str = "hybrid"):
+                 cache_mode: str = "hybrid", generation_mode: str = "api_hint"):
         """
         Args:
             cache_mode: "hybrid" (text+cache), "latent_only" (cache only), "text_only" (no cache)
+            generation_mode: "api_hint" (API with text hint), "hybrid" (local+API), "local" (local only)
         """
         super().__init__(id, "MathSolverCache", domain, llm_name)
         
@@ -36,6 +37,7 @@ class MathSolverCache(Node):
         
         # Cache communication mode
         self.cache_mode = cache_mode  # "hybrid", "latent_only", "text_only"
+        self.generation_mode = generation_mode  # "api_hint", "hybrid", "local"
     
     def _process_inputs(self, raw_inputs: Dict[str, str], 
                        spatial_info: Dict[str, Dict], 
@@ -124,6 +126,7 @@ class MathSolverCache(Node):
                 messages, 
                 past_key_values=past_kv,  # Input: fused cache from graph
                 latent_steps=10,
+                generation_mode=self.generation_mode,  # Pass generation mode
             )
             
             # Step 4: Store cache for graph successors

@@ -66,14 +66,14 @@ class HybridCacheLLM:
         messages: List[Dict],
         past_key_values: Optional[Tuple] = None,
         latent_steps: int = 10,
+        generation_mode: str = "api_hint",  # "api_hint", "hybrid", "local"
         **kwargs
     ) -> Tuple[str, Tuple]:
         """
-        Generate with hybrid cache
+        Generate with cache
         
-        Flow:
-        1. Small local model generates real KV-cache
-        2. API generates final text (cache converted to context)
+        Args:
+            generation_mode: "api_hint" (API with text hint), "hybrid" (local+API), "local" (local only)
         
         Returns:
             (text_response, kv_cache)
@@ -84,6 +84,12 @@ class HybridCacheLLM:
         attention_mask = encoded["attention_mask"].to(self.hybrid_model.device)
         
         # Step 1: Generate real KV-cache with small local model
+        has_input_cache = past_key_values is not None
+        if has_input_cache:
+            print(f"   🔗 [CACHE] Using input cache with {len(past_key_values)} layers")
+        else:
+            print(f"   🆕 [CACHE] No input cache - generating from scratch")
+        
         cache_kv = self.hybrid_model.generate_latent_batch(
             input_ids,
             attention_mask,
@@ -91,11 +97,37 @@ class HybridCacheLLM:
             past_key_values=past_key_values,
         )
         
-        # Step 2: Generate text with API (cache as context)
-        text, _ = await self.hybrid_model.generate_text_batch_api(
-            messages,
-            past_key_values=cache_kv,
-            max_tokens=kwargs.get("max_tokens", 256)
-        )
+        print(f"   ✅ [CACHE] Generated cache with {len(cache_kv)} layers, seq_len={cache_kv[0][0].shape[2]}")
+        
+        # Step 2: Generate text based on mode
+        if generation_mode == "hybrid":
+            # HYBRID: Local model + API refinement
+            print(f"   ⭐ [MODE] HYBRID (local + API refinement)")
+            text, cache_kv = await self.hybrid_model.generate_text_batch_hybrid(
+                input_ids,
+                messages,
+                attention_mask=attention_mask,
+                past_key_values=cache_kv,
+                max_tokens=kwargs.get("max_tokens", 256)
+            )
+        elif generation_mode == "local":
+            # LOCAL: Local model only (real cache usage)
+            print(f"   🖥️  [MODE] LOCAL (local model only, real cache)")
+            text, cache_kv = self.hybrid_model.generate_text_batch(
+                input_ids,
+                attention_mask=attention_mask,
+                past_key_values=cache_kv,
+                max_new_tokens=kwargs.get("max_tokens", 256)
+            )
+        else:  # api_hint
+            # API_HINT: API with text hint
+            print(f"   🌐 [MODE] API_HINT (API with text hint)")
+            text, _ = await self.hybrid_model.generate_text_batch_api(
+                messages,
+                past_key_values=cache_kv,
+                max_tokens=kwargs.get("max_tokens", 256)
+            )
+        
+        print(f"   📝 [RESULT] Generated {len(text[0])} characters of text")
         
         return text[0], cache_kv

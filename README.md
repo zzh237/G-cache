@@ -410,6 +410,196 @@ python run_gsm8k_cache.py --llm_name Qwen/Qwen3-1.7B --use_cache --device cuda
 
 ---
 
+## 🔄 Cache Flow Explained
+
+### What Are Agent IDs?
+
+Agent IDs like `3KsM`, `QXan`, `5Hp5` are randomly generated 4-character identifiers for each agent node in the graph.
+
+### Agent Graph Structure
+
+```
+     3KsM (MathSolver) → cache: 2377 tokens
+     QXan (MathSolver) → cache: 474 tokens  
+     5Hp5 (MathSolver) → cache: 181 tokens
+       ↓ ↓ ↓ (all feed into)
+     5xcm (Decision Maker)
+       ↓ receives: 3KsM's cache (first one)
+       ↓ generates: final answer
+```
+
+### What Comes From Cache vs LLM?
+
+| Component | What It Does | Visible? | Example |
+|-----------|-------------|----------|----------|
+| **Cache (GPU)** | Stores reasoning as tensors | ❌ No | `torch.Size([1, 2, 2377, 128])` |
+| **API (qwen-flash)** | Generates text responses | ✅ Yes | "Let's solve step by step..." |
+| **Cache Fusion** | Combines multiple caches | ❌ No | Internal process |
+| **Graph Structure** | Routes cache between agents | ✅ Yes | Shown in logs |
+
+**Key Insight**: Cache = "compressed thoughts" that agents pass to each other. API converts these thoughts into readable text.
+
+### ⚠️ Important: How Cache is Used
+
+**Cache is NOT directly used by API!** Here's the actual flow:
+
+1. **Small local model (GPU)** generates KV-cache tensors
+2. **Cache is converted to text context**: `"[Using 28 layers of cached reasoning from previous agents, 2377 tokens]"`
+3. **This text is prepended to the API prompt**
+4. **API (qwen-flash) generates response** based on the text context (NOT the raw cache)
+
+**Why?** APIs don't support KV-cache input - they only accept text. The cache serves as a "hint" to the API about what previous agents computed.
+
+### Cache Flow Example
+
+**Without Cache (Cold Start)**:
+```
+Agent 3KsM:
+  🆕 No input cache
+  🧠 Generates from scratch
+  📝 Output: "Let's solve... Total = $64"
+  💾 Stores cache: 2377 tokens
+```
+
+**With Cache (Warm Start)**:
+```
+Agent 5xcm:
+  🔗 Receives cache from 3KsM (2377 tokens)
+  🧠 Continues from 3KsM's reasoning
+  📝 Output: "After reviewing... The answer is 64"
+  💾 Stores cache: 3724 tokens (grew from 2377)
+```
+
+### Sequence Length Mismatch
+
+**Problem**: Can't fuse caches of different lengths (2377 ≠ 474 ≠ 181)
+
+**Solution (LatentMAS-proven)**: Use first cache only
+- Takes 3KsM's cache (2377 tokens)
+- Ignores QXan and 5Hp5 caches
+- Sequential passing (proven by LatentMAS paper)
+
+### Debug Markers
+
+Look for these in output:
+```
+🔗 [CACHE] Using input cache with 28 layers     ← Cache is being used
+🆕 [CACHE] No input cache - generating from scratch  ← No cache (first agent)
+✅ [CACHE] Generated cache with 28 layers, seq_len=2377  ← Cache created
+🤖 [API] Calling qwen-flash to generate text...  ← API generates text
+📝 [API] Generated 1234 characters of text       ← Text output
+```
+
+### Cache Structure Details
+
+**What is `past_key_values`?**
+
+Type: Tuple of tuples (NOT text, NOT string)
+
+```python
+past_key_values = (
+    (key_tensor_0, value_tensor_0),    # Layer 0: [1, 2, 2377, 128]
+    (key_tensor_1, value_tensor_1),    # Layer 1: [1, 2, 2377, 128]
+    # ... 26 more layers ...
+    (key_tensor_27, value_tensor_27)   # Layer 27: [1, 2, 2377, 128]
+)
+```
+
+**Total**: 28 layers × 2 tensors (key + value) = 56 tensors
+
+**Tensor shape**: `[batch=1, heads=2, seq_len=2377, hidden_dim=128]`
+- Data type: `torch.bfloat16` (16-bit floating point)
+- Device: `cuda:0` (GPU memory)
+
+**Why Can't API Use This?**
+
+API endpoints only accept TEXT, not binary tensors.
+
+**Solution**: Convert to text hint
+```python
+# Cache (tensor): 56 tensors × millions of numbers
+past_key_values = ((tensor1, tensor2), ...)
+
+# Converted to text:
+cache_info = "[Using 28 layers of cached reasoning, 2377 tokens]"
+
+# Sent to API:
+prompt = cache_info + "\n\n" + original_prompt
+```
+
+**Analogy**: Cache = full book (tensor data), API receives = "This person read a 300-page book" (text hint)
+
+### Two Ways to Generate Text
+
+**Method 1: Local Model with Cache Tensors (REAL cache usage)**
+```python
+# Function: generate_text_batch()
+# Uses: Local GPU model (Qwen2.5-1.5B)
+# Cache: Passed DIRECTLY as tensors to model.generate()
+
+outputs = model.generate(
+    input_ids=input_ids,
+    past_key_values=cache_tensors,  # ← REAL cache usage!
+    ...
+)
+```
+
+**Method 2: API with Text Hint (Simulated cache)**
+```python
+# Function: generate_text_batch_api()
+# Uses: API (qwen-flash)
+# Cache: Converted to text hint, prepended to prompt
+
+prompt = "[Using 28 layers of cache, 2377 tokens]\n\n" + original_prompt
+response = api.chat.completions.create(
+    messages=[{"content": prompt}],  # ← Text hint only
+    ...
+)
+```
+
+**Comparison**:
+
+| Aspect | Local (Real Cache) | API (Text Hint) |
+|--------|-------------------|------------------|
+| **Cache Format** | Tensor objects | Text string |
+| **Cache Usage** | Direct (model.generate) | Indirect (text context) |
+| **GPU Required** | Yes (~4GB) | No |
+| **Speed** | Faster (cache reuse) | Slower (no cache reuse) |
+| **Quality** | Good (small model) | Better (large API model) |
+| **Cost** | GPU cost | API cost |
+| **Best For** | Pure local | API only | **Production** ⭐ |
+
+**Key Difference**:
+- **Local**: `model.generate(past_key_values=cache_tensors)` ← Tensors used directly
+- **API**: `api.create(messages=[text_hint])` ← Only text hint sent
+
+**Why API Can't Use Cache Tensors**:
+- API endpoints only accept JSON/text
+- Can't send binary tensor data over HTTP
+- Solution: Convert cache metadata to text hint
+
+**Method 3: TRUE Hybrid (BEST - combines both!)**
+```python
+# Function: generate_text_batch_hybrid()
+# Step 1: Local model uses cache tensors (fast)
+# Step 2: API refines output (high quality)
+
+local_text, new_cache = model.generate_text_batch(
+    input_ids, past_key_values=cache_tensors  # ← Real cache!
+)
+api_text, _ = await api.generate_text_batch_api(
+    messages_with_local_context  # ← API refines
+)
+return api_text, new_cache  # Best of both!
+```
+
+**Trade-off**:
+- Local only: Real cache ✅ but small model ❌
+- API only: Large model ✅ but no cache ❌
+- **Hybrid**: Real cache ✅ + Large model ✅ = BEST ⭐
+
+---
+
 ## 🔌 API Model Options
 
 ### Default: qwen-flash ✅
@@ -443,6 +633,56 @@ python run_gsm8k_cache_API.py --llm_name qwen-plus
 # qwen-turbo (alternative)
 python run_gsm8k_cache_API.py --llm_name qwen-turbo
 ```
+
+---
+
+## 🎮 Generation Modes
+
+### Three Ways to Generate Text
+
+#### 1. API_HINT (Default)
+
+**Method**: `generate_text_batch_api`
+
+```bash
+python run_gsm8k_cache_API.py --llm_name hybrid_cache --use_cache --generation_mode api_hint
+```
+
+**Flow**: Cache → Text hint → API
+
+**Pros**: Simple | **Cons**: No real cache usage
+
+#### 2. HYBRID (Best Quality) ⭐
+
+**Method**: `generate_text_batch_hybrid`
+
+```bash
+python run_gsm8k_cache_API.py --llm_name hybrid_cache --use_cache --generation_mode hybrid
+```
+
+**Flow**: Cache → Local model (uses cache) → API refines
+
+**Pros**: Real cache + API quality | **Cons**: Slower
+
+#### 3. LOCAL (Pure Local)
+
+**Method**: `generate_text_batch`
+
+```bash
+python run_gsm8k_cache_API.py --llm_name hybrid_cache --use_cache --generation_mode local
+```
+
+**Flow**: Cache → Local model (uses cache) → Output
+
+**Pros**: Real cache, no API cost | **Cons**: Lower quality
+
+### Comparison
+
+| Mode | Cache Usage | Quality | Speed | API Cost |
+|------|-------------|---------|-------|----------|
+| **api_hint** | Text hint | Good | Medium | Yes |
+| **hybrid** | Real tensors | **Best** ⭐ | Slow | Yes |
+| **local** | Real tensors | OK | Fast | No |
 
 ---
 
