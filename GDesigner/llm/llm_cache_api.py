@@ -20,14 +20,16 @@ class QwenAPI:
     """
     def __init__(self, model_name: str = "qwen-plus", api_key: str = None):
         self.model_name = model_name
-        # Use API_KEY from .env (supports both names for compatibility)
+        # Use API_KEY and BASE_URL from .env
         self.api_key = api_key or os.getenv("API_KEY") or os.getenv("DASHSCOPE_API_KEY")
+        base_url = os.getenv("BASE_URL") or "https://dashscope.aliyuncs.com/compatible-mode/v1"
         if not self.api_key:
             raise ValueError("API key not found! Set API_KEY in .env file")
         
+        print(f"[API] Using base_url: {base_url}")
         self.client = AsyncOpenAI(
             api_key=self.api_key,
-            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+            base_url=base_url,
         )
     
     async def agen(self, messages: List[Dict], **kwargs) -> str:

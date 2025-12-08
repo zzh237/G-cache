@@ -59,14 +59,16 @@ class HybridCacheModel:
             ).to(self.device).eval()
         
         # API client for text generation
-        # Use API_KEY from .env (supports both names for compatibility)
+        # Use API_KEY and BASE_URL from .env
         api_key = os.getenv("API_KEY") or os.getenv("DASHSCOPE_API_KEY")
+        base_url = os.getenv("BASE_URL") or "https://dashscope.aliyuncs.com/compatible-mode/v1"
         if not api_key:
             raise ValueError("API key not found! Set API_KEY in .env file")
         
+        print(f"[API] Using base_url: {base_url}")
         self.api_client = AsyncOpenAI(
             api_key=api_key,
-            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+            base_url=base_url,
         )
         self.api_model_name = api_model_name
         
