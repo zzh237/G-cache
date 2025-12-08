@@ -106,6 +106,9 @@ async def main():
     else:
         node_kwargs = [{} for _ in agent_names]
     
+    # Remove node_kwargs from kwargs if it exists to avoid duplicate
+    kwargs.pop('node_kwargs', None)
+    
     # Create CacheGraph
     graph = CacheGraph(
         domain="gsm8k",
