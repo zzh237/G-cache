@@ -30,7 +30,9 @@ from run_gsm8k import load_result, dataloader, get_kwargs
 
 def parse_args():
     parser = argparse.ArgumentParser(description="CacheDesigner (supports hybrid/API/local modes)")
-    parser.add_argument("--dataset_json", type=str, default="datasets/gsm8k/gsm8k.jsonl")
+    # Use absolute path for dataset (relative to project root)
+    default_dataset = os.path.join(project_root, "datasets/gsm8k/gsm8k.jsonl")
+    parser.add_argument("--dataset_json", type=str, default=default_dataset)
     parser.add_argument("--llm_name", type=str, default="hybrid_cache",
                         help="LLM mode: hybrid_cache (small GPU+API), qwen-plus (API only), local_cache (local only)")
     parser.add_argument('--mode', type=str, default='FullConnected')
