@@ -4,7 +4,10 @@ Simulates cache for testing structure without GPU
 """
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Add parent directory to path FIRST (before any imports)
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
+print(f"[DEBUG] Added to sys.path: {project_root}")
 
 import argparse
 import json
@@ -19,8 +22,9 @@ from GDesigner.utils.const import GDesigner_ROOT
 from GDesigner.graph.cache_graph import CacheGraph
 from GDesigner.tools.reader.readers import JSONLReader
 from GDesigner.utils.globals import Time, Cost, PromptTokens, CompletionTokens
-from datasets.gsm8k_dataset import gsm_data_process, gsm_get_predict
 
+# Import from local datasets folder (not HuggingFace datasets)
+from datasets.gsm8k_dataset import gsm_data_process, gsm_get_predict
 from run_gsm8k import load_result, dataloader, get_kwargs
 
 
