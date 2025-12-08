@@ -135,6 +135,8 @@ async def main():
             answer = record["answer"]
             answers.append(answer)
             input_dict = {"task": task}
+            print(f"\n📝 Task: {task[:100]}...")  # Debug: show task
+            print(f"🎯 Expected answer: {answer}")
             # Reuse same graph for all tasks (models can't be deepcopied)
             answer_log_probs.append(asyncio.create_task(graph.arun(input_dict, args.num_rounds)))
         

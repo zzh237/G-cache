@@ -62,3 +62,10 @@ class QwenTurboAPI(QwenAPI):
     """Alias for qwen-turbo model"""
     def __init__(self, **kwargs):
         super().__init__(model_name="qwen-turbo", **kwargs)
+
+
+@LLMRegistry.register('qwen-flash')
+class QwenFlashAPI(QwenAPI):
+    """Alias for qwen-flash model (faster and cheaper)"""
+    def __init__(self, **kwargs):
+        super().__init__(model_name="qwen-flash", **kwargs)

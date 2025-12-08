@@ -211,11 +211,13 @@ python run_gsm8k_cache_API.py --llm_name hybrid_cache --use_cache
 
 **What it does**:
 - ✅ Small local model (1.5B) generates **real KV-cache**
-- ✅ API (qwen-plus) generates final text
+- ✅ API (qwen-flash) generates final text (faster & cheaper than qwen-plus)
 - ✅ **Alignment matrix** enabled
-- ⚠️ Requires API key (currently blocked by IP whitelist)
+- ⚠️ Requires API key
 
 **GPU**: ~4GB only
+
+**API models available**: `qwen-flash` (default), `qwen-plus`, `qwen-turbo`
 
 **Use this for**: When you have API access
 
@@ -225,7 +227,7 @@ python run_gsm8k_cache_API.py --llm_name hybrid_cache --use_cache
 
 ```bash
 cd experiments
-python run_gsm8k_cache_API.py --llm_name qwen-plus
+python run_gsm8k_cache_API.py --llm_name qwen-flash  # or qwen-plus, qwen-turbo
 ```
 
 **What it does**:
@@ -405,6 +407,42 @@ python run_gsm8k_cache.py --llm_name Qwen/Qwen3-1.7B --use_cache --device cuda
 ```
 
 **That's it!** 🎉
+
+---
+
+## 🔌 API Model Options
+
+### Default: qwen-flash ✅
+
+The code now uses **qwen-flash** by default (faster and cheaper than qwen-plus).
+
+### Available Models
+
+| Model | Speed | Cost | Use Case |
+|-------|-------|------|----------|
+| **qwen-flash** | ⚡ Fastest | 💰 Cheapest | Default (recommended) |
+| qwen-plus | 🐢 Medium | 💰💰 Medium | More capable |
+| qwen-turbo | ⚡ Fast | 💰 Cheap | Alternative |
+
+### Usage Examples
+
+**Hybrid Mode (Cache + API)**:
+```bash
+# Default: qwen-flash
+python run_gsm8k_cache_API.py --llm_name hybrid_cache --use_cache
+```
+
+**API-Only Mode (No Cache)**:
+```bash
+# qwen-flash (fastest, cheapest)
+python run_gsm8k_cache_API.py --llm_name qwen-flash
+
+# qwen-plus (more capable)
+python run_gsm8k_cache_API.py --llm_name qwen-plus
+
+# qwen-turbo (alternative)
+python run_gsm8k_cache_API.py --llm_name qwen-turbo
+```
 
 ---
 

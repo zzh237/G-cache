@@ -23,7 +23,7 @@ class HybridCacheLLM:
     """
     def __init__(self, 
                  cache_model_name: str = "Qwen/Qwen2.5-1.5B-Instruct",  # Larger model for better cache
-                 api_model_name: str = "qwen-plus",
+                 api_model_name: str = "qwen-flash",  # Changed to qwen-flash (faster & cheaper)
                  device: str = "cuda:0",
                  device_map: str = "auto"):  # Auto-distribute across GPUs
         self.model_name = api_model_name
