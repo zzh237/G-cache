@@ -173,34 +173,79 @@ optimizer = torch.optim.Adam(params, lr=0.1)
 
 ---
 
-## 🎯 Three Modes
+## 🎯 Four Modes
 
-### Mode 1: Hybrid (RECOMMENDED) ✅
+### Mode 1: Pure Local with Real Cache (BEST for Research) ✅
 
 ```bash
-# API key loaded from .env automatically!
+cd experiments
+export CUDA_VISIBLE_DEVICES=1,2  # Use 2 GPUs for 7B model
+python run_gsm8k_cache.py --llm_name Qwen/Qwen3-8B --use_cache --device cuda
+```
+
+**What it does**:
+- ✅ **Real KV-cache** from local model (LatentMAS)
+- ✅ **Alignment matrix** enabled by default
+- ✅ Trains GCN + CacheFuser
+- ✅ No API needed (fully local)
+- ✅ Uses HuggingFace transformers (no vLLM)
+
+**GPU**: ~16GB for 8B model (or ~4GB for 1.7B model)
+
+**Model options**:
+- `Qwen/Qwen3-1.7B` - Small, ~4GB GPU
+- `Qwen/Qwen3-4B` - Medium, ~8GB GPU  
+- `Qwen/Qwen3-8B` - Large, ~16GB GPU (recommended)
+
+**Use this for**: Real cache experiments, full control
+
+---
+
+### Mode 2: Hybrid (Small GPU + API) ✅
+
+```bash
+cd experiments
+export CUDA_VISIBLE_DEVICES=1  # Only need 1 GPU
 python run_gsm8k_cache_API.py --llm_name hybrid_cache --use_cache
 ```
 
-**Cache**: ✅ Real KV-cache tensors
+**What it does**:
+- ✅ Small local model (1.5B) generates **real KV-cache**
+- ✅ API (qwen-plus) generates final text
+- ✅ **Alignment matrix** enabled
+- ⚠️ Requires API key (currently blocked by IP whitelist)
 
-**Pros**: Real cache + Free API + Only 4GB GPU + No vLLM needed!
+**GPU**: ~4GB only
 
-### Mode 2: API Baseline
+**Use this for**: When you have API access
+
+---
+
+### Mode 3: API Baseline (No Cache)
 
 ```bash
+cd experiments
 python run_gsm8k_cache_API.py --llm_name qwen-plus
 ```
 
-**Cache**: ❌ None (baseline)
+**What it does**:
+- ❌ No real cache (text-based only)
+- Uses API for everything
+- Baseline for comparison
 
-### Mode 3: Pure Local
+**GPU**: 0GB
+
+---
+
+### Mode 4: Local Cache (Deprecated)
 
 ```bash
+cd experiments
+export CUDA_VISIBLE_DEVICES=1,2
 python run_gsm8k_cache_API.py --llm_name local_cache --use_cache
 ```
 
-**Cache**: ✅ Real KV-cache tensors
+**Note**: Use Mode 1 (`run_gsm8k_cache.py`) instead - it's the same but better tested
 
 ---
 
@@ -352,9 +397,11 @@ model = HybridCacheModel(use_alignment=False)  # Disable alignment
 
 **Alignment**: Both have it! (LatentMAS optional, G-cache default)
 
-**Run**:
+**Run (Pure Local - RECOMMENDED)**:
 ```bash
-python run_gsm8k_cache_API.py --llm_name hybrid_cache --use_cache
+cd experiments
+export CUDA_VISIBLE_DEVICES=1,2
+python run_gsm8k_cache.py --llm_name Qwen/Qwen3-1.7B --use_cache --device cuda
 ```
 
 **That's it!** 🎉
