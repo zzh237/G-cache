@@ -51,6 +51,22 @@ class CacheFuser(nn.Module):
     
     def _fuse_tensor_caches(self, sharer_caches: List[Tuple], edge_weights: List[float], tau: float) -> Tuple:
         """Fuse tensor-based KV-caches (local model mode)"""
+        # LatentMAS-style: If only one cache, return it directly (no fusion needed)
+        if len(sharer_caches) == 1:
+            return sharer_caches[0]
+        
+        # For multiple caches: Check if all have same sequence length
+        seq_lengths = [cache[0][0].shape[2] for cache in sharer_caches if len(cache) > 0]
+        if not seq_lengths:
+            return None
+        
+        # If sequence lengths differ, use LatentMAS approach: take first cache only
+        # (LatentMAS doesn't fuse - it passes sequentially)
+        if len(set(seq_lengths)) > 1:
+            print(f"   ⚠️ Sequence length mismatch: {seq_lengths}. Using first cache only (LatentMAS-style).")
+            return sharer_caches[0]
+        
+        # All caches have same length - safe to fuse
         fused_layers = []
         for l in range(self.num_layers):
             gate = torch.sigmoid(self.layer_gates[l] / tau)
