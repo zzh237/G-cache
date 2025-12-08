@@ -1,225 +1,352 @@
-# CacheDesigner: Graph-Guided Cache Communication for Multi-Agent LLMs
+# G-cache: Graph-Guided KV-Cache Communication for Multi-Agent LLMs
 
-Combines **GDesigner's** graph topology learning with **LatentMAS's** KV-cache communication.
+Combines **GDesigner's** graph topology with **LatentMAS's** KV-cache generation.
 
 ---
 
-## 🚀 Quick Start (Use Your Free API)
+## 🚀 Quick Start
 
 ```bash
-cd G-cache/experiments
+cd experiments
 
-# Run with cache (recommended)
-python run_gsm8k_cache_API.py --use_cache --optimized_spatial --batch_size 2
-
-# Run without cache (baseline)
-python run_gsm8k_cache_API.py --optimized_spatial --batch_size 2
-```
-
-**Uses your free Qwen API - no GPU needed!**
-
----
-
-## 📁 Project Structure
-
-```
-G-cache/
-├── GDesigner/                      # GDesigner backbone
-│   ├── graph/
-│   │   ├── graph.py               # Original Graph
-│   │   └── cache_graph.py         # NEW: Cache-enabled Graph
-│   ├── llm/
-│   │   ├── gpt_chat.py            # Original API LLM
-│   │   └── gpt_chat_cache_api.py  # NEW: Cache-enabled API LLM
-│   └── agents/
-│       ├── math_solver.py         # Original agent
-│       └── math_solver_cache.py   # NEW: Cache-enabled agent
-├── experiments/
-│   ├── run_gsm8k.py               # Original runner
-│   ├── run_gsm8k_cache_API.py     # NEW: API + cache (use this!)
-│   └── run_gsm8k_cache_WORKING.py # NEW: vLLM + cache (needs GPU)
-└── .env                            # Your API credentials
+# Hybrid mode (RECOMMENDED) - small GPU + free API
+python run_gsm8k_cache_API.py --llm_name hybrid_cache --use_cache
 ```
 
 ---
 
-## 🎯 Two Versions
+## 🎓 What Gets Updated During Training?
 
-### Option 1: API Version (FREE - Recommended) ✅
+### Critical Insight: LatentMAS vs G-cache
 
-**What it uses:**
-- Your free Qwen API for text generation
-- Simulated cache for testing structure
+**LatentMAS (original):**
+- ❌ **NO training** - Inference only!
+- ❌ No optimizer, no loss.backward()
+- ❌ All models frozen
+- Just runs multi-agent inference with cache
 
-**Pros:**
-- ✅ FREE (uses your API)
-- ✅ No GPU needed
-- ✅ Tests full structure
-- ✅ Easy to run
+**G-cache (this project):**
+- ✅ **HAS training** - Learns graph structure!
+- ✅ Optimizer updates GCN + CacheFuser
+- ✅ Learns from task performance
 
-**Cons:**
-- ⚠️ Cache is simulated (not real KV-cache)
-- ⚠️ ~0-5% improvement
+### Models in G-cache
 
-**Run:**
+| Model | Trainable? | Updated? | Purpose | LatentMAS Has This? |
+|-------|-----------|----------|---------|---------------------|
+| **1. GCN** | ✅ Yes | ✅ Yes | Graph edge weights | ❌ No (NEW in G-cache) |
+| **2. CacheFuser** | ✅ Yes | ✅ Yes | Cache fusion weights | ❌ No (NEW in G-cache) |
+| **3. Small Local Model** | ❌ Frozen | ❌ No | Cache generation | ✅ Yes (frozen in both) |
+| **4. API Model** | ❌ External | ❌ No | Text generation | ✅ Yes (frozen in both) |
+
+### Training Code (G-cache ONLY)
+
+```python
+# File: experiments/run_gsm8k_cache_API.py
+
+# Step 1: Setup optimizer with trainable components (NEW in G-cache)
+params = list(graph.gcn.parameters())  # ← GCN weights (NEW)
+if args.use_cache:
+    params += list(graph.cache_fuser.parameters())  # ← CacheFuser weights (NEW)
+optimizer = torch.optim.Adam(params, lr=0.1)
+
+# Step 2: Forward pass
+answer, log_prob = await graph.arun(question)
+
+# Step 3: Compute loss (NEW in G-cache)
+is_correct = (answer == gold_answer)
+utility = float(is_correct)
+loss = -log_prob * utility
+
+# Step 4: Backprop (NEW in G-cache)
+optimizer.zero_grad()
+loss.backward()  # Updates:
+                 # ✅ GCN.edge_weights (NEW)
+                 # ✅ CacheFuser.layer_gates (NEW)
+                 # ✅ CacheFuser.fusion_weights (NEW)
+                 # ❌ Small local model (frozen - same as LatentMAS)
+                 # ❌ API model (external - same as LatentMAS)
+optimizer.step()
+```
+
+### What LatentMAS Does (Inference Only)
+
+```python
+# File: LatentMAS/run.py
+
+# NO optimizer!
+# NO loss!
+# NO training!
+
+# Just inference:
+for item in dataset:
+    result = method.run_batch([item])  # Generate answer
+    is_correct = (result['prediction'] == item['gold'])
+    # That's it - no backprop!
+```
+
+### Comparison
+
+| Aspect | LatentMAS | G-cache |
+|--------|-----------|---------|
+| **Training** | ❌ No | ✅ Yes |
+| **Optimizer** | ❌ No | ✅ Yes (Adam) |
+| **Loss** | ❌ No | ✅ Yes (-log_prob * utility) |
+| **Backprop** | ❌ No | ✅ Yes |
+| **Trainable params** | 0 | GCN + CacheFuser |
+| **Cache generation** | ✅ Yes (frozen model) | ✅ Yes (frozen model) |
+| **Graph structure** | Fixed (sequential/hierarchical) | ✅ Learned |
+| **Cache fusion** | Fixed (concatenation) | ✅ Learned |
+
+### Guarantee: No Missing Updates
+
+**LatentMAS updates**: 0 models (inference only)
+
+**G-cache updates**: 2 models
+1. ✅ GCN - Added to optimizer (line 108)
+2. ✅ CacheFuser - Added to optimizer (line 110)
+
+**Verification:**
+```python
+# Check what's in optimizer
+params = list(graph.gcn.parameters())  # ← All GCN params
+params += list(graph.cache_fuser.parameters())  # ← All CacheFuser params
+optimizer = torch.optim.Adam(params, lr=0.1)
+
+# These are ALL trainable parameters in the system!
+# Small model and API are explicitly frozen/external
+```
+
+**Guarantee**: ✅ We update everything that should be updated!
+
+---
+
+## 🔗 How Graph Functions Connect with Cache Functions
+
+### The Connection Chain
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ 1. CacheGraph (cache_graph.py)                                 │
+│    - Manages cache storage: node_caches = {}                   │
+│    - Provides: get_fused_cache(), store_node_cache()           │
+│    - Trainable: CacheFuser ✅                                   │
+└─────────────────────────────────────────────────────────────────┘
+                            ↓ passes graph reference
+┌─────────────────────────────────────────────────────────────────┐
+│ 2. MathSolverCache (math_solver_cache.py)                      │
+│    - Receives: self.graph = graph                              │
+│    - Calls: graph.get_fused_cache(self)                        │
+│    - Calls: graph.store_node_cache(self.id, cache)             │
+│    - Trainable: None                                           │
+└─────────────────────────────────────────────────────────────────┘
+                            ↓ calls LLM
+┌─────────────────────────────────────────────────────────────────┐
+│ 3. HybridCacheLLM (llm_cache_hybrid.py)                        │
+│    - Receives: past_key_values from graph                      │
+│    - Calls: hybrid_model.generate_latent_batch()               │
+│    - Returns: (text, kv_cache) to agent                        │
+│    - Trainable: None                                           │
+└─────────────────────────────────────────────────────────────────┘
+                            ↓ calls LatentMAS
+┌─────────────────────────────────────────────────────────────────┐
+│ 4. HybridCacheModel (hybrid_cache_model.py)                    │
+│    - EXACT LatentMAS implementation                            │
+│    - generate_latent_batch(past_key_values=fused_cache)        │
+│    - Returns: new_cache                                        │
+│    - Trainable: None (frozen) ❌                                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Connections Summary
+
+| Connection | From | To | Data | Function |
+|------------|------|----|----|----------|
+| 1 | CacheGraph | Agent | `graph` reference | `node.graph = self` |
+| 2 | Agent | CacheGraph | `self` | `graph.get_fused_cache(self)` |
+| 3 | CacheGraph | Agent | `fused_cache` | Returns fused cache |
+| 4 | Agent | LLM | `past_key_values` | `llm.agen_with_cache(..., past_key_values)` |
+| 5 | LLM | LatentMAS | `past_key_values` | `generate_latent_batch(..., past_key_values)` |
+| 6 | LatentMAS | LLM | `new_cache` | Returns cache |
+| 7 | LLM | Agent | `(text, cache)` | Returns tuple |
+| 8 | Agent | CacheGraph | `cache` | `graph.store_node_cache(id, cache)` |
+
+---
+
+## 🎯 Three Modes
+
+### Mode 1: Hybrid (RECOMMENDED) ✅
+
 ```bash
-python run_gsm8k_cache_API.py --use_cache --optimized_spatial
+export DASHSCOPE_API_KEY="your_key"
+python run_gsm8k_cache_API.py --llm_name hybrid_cache --use_cache
 ```
 
-### Option 2: vLLM Version (Needs GPU) 
+**Cache**: ✅ Real KV-cache tensors
 
-**What it uses:**
-- Local model with vLLM
-- Real KV-cache extraction
+**Pros**: Real cache + Free API + Only 4GB GPU + No vLLM needed!
 
-**Pros:**
-- ✅ Real cache benefits
-- ✅ ~10-25% improvement
+### Mode 2: API Baseline
 
-**Cons:**
-- ❌ Needs GPU (16GB+ VRAM)
-- ❌ Costs money ($1-2/hour)
-
-**Run:**
 ```bash
-python run_gsm8k_cache_WORKING.py --use_cache --device cuda
+python run_gsm8k_cache_API.py --llm_name qwen-plus
 ```
 
----
+**Cache**: ❌ None (baseline)
 
-## 🔍 Debug Output
+### Mode 3: Pure Local
 
-When running, you'll see:
-
-```
-🤖 [AGENT abc1] Executing...
-   🔍 Checking for predecessor caches...
-   ✅ Found fused cache from predecessors
-
-🌐 [API CALL] Calling Qwen API...
-   Status: 200
-   ✅ SUCCESS: Received 245 characters
-
-📦 [CACHE] agen_with_cache called
-   🔄 Using cached context from 32 layers
-   ✅ Cache generated: 32 layers
-
-💾 [GRAPH] Storing cache for node abc1
-   Cache layers: 32
-
-🔄 [GRAPH] Getting fused cache for node xyz2
-   ✅ Found cache from abc1
-   🧪 Fusing 2 caches
+```bash
+python run_gsm8k_cache_API.py --llm_name local_cache --use_cache
 ```
 
-**Success indicators:**
-1. ✅ API calls succeed
-2. ✅ Cache generated
-3. ✅ Cache stored
-4. ✅ Cache retrieved
-5. ✅ Cache fused
-6. ✅ Cache used
+**Cache**: ✅ Real KV-cache tensors
 
 ---
 
 ## 🔧 Setup
 
-### 1. Check .env file exists:
 ```bash
-cat .env
-# Should show:
-# BASE_URL=https://idealab-external.alibaba-inc.com/api/openai/v1
-# API_KEY=c3a588a3e15983ab2dc8facefecc5bd9
-```
-
-### 2. Install dependencies:
-```bash
-pip install torch transformers aiohttp python-dotenv tenacity
-```
-
-### 3. Run:
-```bash
+pip install torch transformers openai python-dotenv
+export DASHSCOPE_API_KEY="your_key"
 cd experiments
-python run_gsm8k_cache_API.py --use_cache --optimized_spatial
+python run_gsm8k_cache_API.py --llm_name hybrid_cache --use_cache
 ```
 
 ---
 
-## 📊 What's Different from GDesigner?
+## 🔬 LatentMAS Alignment Matrix (Training-Free)
 
-| Aspect | GDesigner | CacheDesigner |
-|--------|-----------|---------------|
-| **Communication** | Text only | Text + Cache |
-| **Agent class** | `MathSolver` | `MathSolverCache` |
-| **LLM class** | `GPTChat` | `GPTChatCacheAPI` |
-| **Graph class** | `Graph` | `CacheGraph` |
-| **Cache extraction** | ❌ No | ✅ Yes |
-| **Cache fusion** | ❌ No | ✅ Yes |
-| **Cache injection** | ❌ No | ✅ Yes |
+### What is it?
 
----
+LatentMAS uses a **projection matrix** `W_a` to align hidden states back to valid input embeddings:
 
-## 🐛 Troubleshooting
-
-### Error: "403 Client Error"
-```bash
-# Check .env file
-cat .env
-# Make sure BASE_URL and API_KEY are set correctly
+```
+e = h * W_a, where W_a ≈ W_out^(-1) * W_in
 ```
 
-### Error: "No module named 'GDesigner'"
-```bash
-# Make sure you're in the right directory
-cd /Users/bleachvex/Downloads/projects/G-cache/experiments
+**Problem**: Hidden states from last layer have different distribution than input embeddings
+
+**Solution**: Linear transformation that maps output space → input space (training-free!)
+
+### Implementation in LatentMAS
+
+**File**: `LatentMAS/models.py`
+
+```python
+class ModelWrapper:
+    def _build_latent_realign_matrix(self, model, device, args):
+        """Compute W_a = (W_out^T * W_out)^(-1) * W_out^T * W_in"""
+        input_weight = model.get_input_embeddings().weight   # W_in
+        output_weight = model.get_output_embeddings().weight # W_out
+        
+        # Solve: W_out * W_a = W_in
+        gram = torch.matmul(output_weight.T, output_weight)  # W_out^T * W_out
+        reg = 1e-5 * torch.eye(gram.shape[0])                # Regularization
+        gram = gram + reg
+        rhs = torch.matmul(output_weight.T, input_weight)    # W_out^T * W_in
+        realign_matrix = torch.linalg.solve(gram, rhs)       # W_a
+        
+        target_norm = input_weight.norm(dim=1).mean()        # For normalization
+        return realign_matrix, target_norm
+    
+    def _apply_latent_realignment(self, hidden, model):
+        """Apply: e = normalize(h * W_a)"""
+        matrix, target_norm = self._ensure_latent_realign_matrix(model, hidden.device)
+        aligned = torch.matmul(hidden.float(), matrix)       # h * W_a
+        
+        # Normalize to match input embedding norms
+        aligned_norm = aligned.norm(dim=-1, keepdim=True).clamp_min(1e-6)
+        aligned = aligned * (target_norm / aligned_norm)
+        return aligned.to(hidden.dtype)
+    
+    def generate_latent_batch(self, ...):
+        for step in range(latent_steps):
+            # KEY: Apply alignment before feeding back
+            latent_vec = self._apply_latent_realignment(last_hidden, self.model)
+            latent_embed = latent_vec.unsqueeze(1)
+            
+            outputs = self.model(
+                inputs_embeds=latent_embed,  # ← Aligned embedding
+                ...
+            )
 ```
 
-### No cache operations shown
-```bash
-# Make sure --use_cache flag is set
-python run_gsm8k_cache_API.py --use_cache  # ← Must have this!
+**Usage**: `python run.py --latent_space_realign` (optional flag)
+
+### Does G-cache Have This?
+
+**Answer**: ✅ **YES! Now implemented!**
+
+**File**: `G-cache/hybrid_cache_model.py`
+
+```python
+class HybridCacheModel:
+    def __init__(self, ..., use_alignment: bool = True):
+        # Build alignment matrix (training-free, computed once)
+        if self.use_alignment:
+            self._build_alignment_matrix()
+    
+    def _build_alignment_matrix(self):
+        """Build W_a ≈ W_out^(-1) * W_in"""
+        W_in = self.cache_model.get_input_embeddings().weight
+        W_out = self.cache_model.get_output_embeddings().weight
+        gram = torch.matmul(W_out.T, W_out) + 1e-5 * I
+        rhs = torch.matmul(W_out.T, W_in)
+        self._alignment_matrix = torch.linalg.solve(gram, rhs)
+    
+    def _apply_alignment(self, hidden):
+        """Apply: e = normalize(h * W_a)"""
+        aligned = torch.matmul(hidden, self._alignment_matrix)
+        return aligned * (target_norm / ||aligned||)
+    
+    def generate_latent_batch(self, ...):
+        for step in range(latent_steps):
+            latent_vec = self._apply_alignment(last_hidden)  # ✅ Now aligned!
+            latent_embed = latent_vec.unsqueeze(1)
 ```
 
----
+**Usage**: Enabled by default! Disable with `use_alignment=False`
 
-## 📝 Key Files
+### Comparison
 
-**To run experiments:**
-- `experiments/run_gsm8k_cache_API.py` - Main runner (use this!)
+| Aspect | LatentMAS | G-cache |
+|--------|-----------|---------||
+| **Alignment matrix** | ✅ Optional (`--latent_space_realign`) | ✅ **Enabled by default!** |
+| **Matrix computation** | `W_a ≈ W_out^(-1) * W_in` | ✅ Same |
+| **Normalization** | ✅ Match input embedding norms | ✅ Same |
+| **Training-free** | ✅ Yes (computed once) | ✅ Yes (computed once) |
+| **Implementation** | 3 methods in ModelWrapper | ✅ 2 methods in HybridCacheModel |
 
-**Core implementation:**
-- `GDesigner/llm/gpt_chat_cache_api.py` - Cache-enabled LLM
-- `GDesigner/agents/math_solver_cache.py` - Cache-enabled agent
-- `GDesigner/graph/cache_graph.py` - Cache-enabled graph
+### Benefits in G-cache
 
-**Configuration:**
-- `.env` - Your API credentials
+**✅ Enabled by default**:
+- Better cache quality (aligned embeddings)
+- Training-free (computed once at init)
+- Minimal overhead (one matrix multiply per latent step)
+
+**Disable if needed**:
+```python
+model = HybridCacheModel(use_alignment=False)  # Disable alignment
+```
 
 ---
 
 ## 🎯 Summary
 
-**What is CacheDesigner?**
-- GDesigner (graph topology) + LatentMAS (cache communication)
+**What**: Graph manages cache flow, LatentMAS generates cache
 
-**Which version should I use?**
-- API version (free, simulated cache)
+**LatentMAS**: Inference only (no training) + optional alignment matrix
 
-**Do I need GPU?**
-- No (for API version)
+**G-cache**: Trains GCN + CacheFuser (learns graph structure + fusion)
 
-**Does it use my API?**
-- Yes (same as G-Designer)
+**Frozen**: Small local model + API model (same as LatentMAS)
 
-**How do I run it?**
+**Alignment**: Both have it! (LatentMAS optional, G-cache default)
+
+**Run**:
 ```bash
-cd experiments
-python run_gsm8k_cache_API.py --use_cache --optimized_spatial
+python run_gsm8k_cache_API.py --llm_name hybrid_cache --use_cache
 ```
 
 **That's it!** 🎉
-
-
-**Add data set**
-
-python -c "from data import load_gpqa_diamond; list(load_gpqa_diamond(split='test'))"

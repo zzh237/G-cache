@@ -94,45 +94,44 @@ class MathSolverCache(Node):
                             spatial_info: Dict[str, Dict], 
                             temporal_info: Dict[str, Dict]) -> str:
         """
-        Execute with graph-guided cache fusion
+        Execute with graph-guided cache fusion (LatentMAS integration)
         
-        Novel contribution: Uses graph topology to determine cache fusion strategy
-        - Spatial predecessors: Fuse their caches (parallel reasoning)
-        - Temporal predecessors: Include their caches (sequential refinement)
+        Flow:
+        1. Get fused cache from graph predecessors (graph-guided)
+        2. Generate latent cache with LatentMAS (generate_latent_batch)
+        3. Generate text from cache (generate_text_batch)
+        4. Store cache for successors (graph-guided sharing)
         """
-        # Get graph reference for cache communication
         graph = getattr(self, 'graph', None)
         
-        # Graph-guided cache retrieval
+        # Step 1: Graph-guided cache retrieval
         past_kv = None
         has_cache = False
         if graph and hasattr(graph, 'get_fused_cache') and self.cache_mode != "text_only":
-            past_kv = graph.get_fused_cache(self)
+            past_kv = graph.get_fused_cache(self)  # Fused from spatial predecessors
             has_cache = past_kv is not None
-            
-            if has_cache and self.verbose:
-                print(f"[{self.id}] Using fused cache from {len(self.spatial_predecessors)} spatial + {len(self.temporal_predecessors)} temporal predecessors")
+            print(f"\n📥 [{self.id}] Received fused cache: {has_cache}")
         
-        # Process inputs with cache awareness
+        # Step 2: Process inputs
         system_prompt, user_prompt = self._process_inputs(input, spatial_info, temporal_info, has_cache)
         messages = [{'role': 'system', 'content': system_prompt}, {'role': 'user', 'content': user_prompt}]
         
-        # Generate with cache if supported
+        # Step 3: Generate with LatentMAS cache
         if hasattr(self.llm, 'agen_with_cache') and self.cache_mode != "text_only":
-            # Use cache-enabled generation
+            print(f"🧠 [{self.id}] Generating with LatentMAS cache (latent_steps=10)")
+            # Uses: generate_latent_batch + generate_text_batch
             response, kv_cache = await self.llm.agen_with_cache(
                 messages, 
-                past_key_values=past_kv,
-                latent_steps=10  # LatentMAS-style latent reasoning steps
+                past_key_values=past_kv,  # Input: fused cache from graph
+                latent_steps=10,
             )
             
-            # Store cache for downstream agents (graph-guided sharing)
+            # Step 4: Store cache for graph successors
             if graph and hasattr(graph, 'store_node_cache'):
                 graph.store_node_cache(self.id, kv_cache)
-                if self.verbose:
-                    print(f"[{self.id}] Stored cache for {len(self.spatial_successors)} spatial + {len(self.temporal_successors)} temporal successors")
+                print(f"💾 [{self.id}] Stored cache for {len(self.spatial_successors)} successors")
         else:
-            # Fallback to text-only generation
+            # Fallback: text-only
             response = await self.llm.agen(messages)
         
         return response

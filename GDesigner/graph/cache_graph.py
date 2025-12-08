@@ -9,34 +9,73 @@ from GDesigner.graph.graph import Graph
 from GDesigner.graph.node import Node
 
 class CacheFuser(nn.Module):
-    """Minimal cache fuser for KV-cache communication between agents"""
+    """Graph-guided cache fusion (supports both tensor and text caches)"""
     def __init__(self, hidden_dim: int, num_layers: int):
         super().__init__()
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
+        # Learnable fusion weights per layer (for tensor caches)
         self.layer_gates = nn.Parameter(torch.zeros(num_layers))
         self.fusion_weights = nn.Parameter(torch.ones(num_layers))
         
-    def forward(self, receiver_cache, sharer_caches, edge_weights, tau=0.5):
-        """Fuse caches with gating"""
+    def forward(self, sharer_caches: List, edge_weights: List[float], tau=0.5):
+        """Fuse multiple caches from graph neighbors"""
         if not sharer_caches:
-            return receiver_cache
+            return None
         
-        fused = []
+        # Check cache type: tensor (local model) or dict (API)
+        first_cache = sharer_caches[0]
+        
+        # Text-based cache (API mode)
+        if isinstance(first_cache, dict):
+            return self._fuse_text_caches(sharer_caches, edge_weights)
+        
+        # Tensor-based cache (local model mode)
+        elif isinstance(first_cache, tuple):
+            return self._fuse_tensor_caches(sharer_caches, edge_weights, tau)
+        
+        return None
+    
+    def _fuse_text_caches(self, sharer_caches: List[Dict], edge_weights: List[float]) -> Dict:
+        """Fuse text-based caches (API mode)"""
+        # Weighted concatenation of summaries
+        fused_summary = ""
+        for w, cache in zip(edge_weights, sharer_caches):
+            summary = cache.get('summary', '')
+            if summary:
+                # Add weight as importance indicator
+                importance = "High" if w > 0.5 else "Medium" if w > 0.3 else "Low"
+                fused_summary += f"[{importance} priority]: {summary}\n"
+        
+        return {'summary': fused_summary.strip()}
+    
+    def _fuse_tensor_caches(self, sharer_caches: List[Tuple], edge_weights: List[float], tau: float) -> Tuple:
+        """Fuse tensor-based KV-caches (local model mode)"""
+        fused_layers = []
         for l in range(self.num_layers):
             gate = torch.sigmoid(self.layer_gates[l] / tau)
-            r_cache = receiver_cache[l] if l < len(receiver_cache) else None
-            if r_cache is None:
-                fused.append(None)
-                continue
             
-            # Aggregate sharer caches
-            agg = sum(w * sc[l] for w, sc in zip(edge_weights, sharer_caches) if l < len(sc))
-            agg = agg / len(sharer_caches) if sharer_caches else 0
+            # Weighted average of caches at layer l
+            fused_k, fused_v = None, None
+            for w, cache in zip(edge_weights, sharer_caches):
+                if l >= len(cache):
+                    continue
+                k, v = cache[l]  # (batch, heads, seq, dim)
+                
+                if fused_k is None:
+                    fused_k = w * k
+                    fused_v = w * v
+                else:
+                    fused_k = fused_k + w * k
+                    fused_v = fused_v + w * v
             
-            # Residual fusion
-            fused.append(r_cache + gate * self.fusion_weights[l] * agg)
-        return fused
+            # Apply learnable gate
+            if fused_k is not None:
+                fused_k = gate * self.fusion_weights[l] * fused_k
+                fused_v = gate * self.fusion_weights[l] * fused_v
+                fused_layers.append((fused_k, fused_v))
+        
+        return tuple(fused_layers) if fused_layers else None
 
 class CacheGraph(Graph):
     """
@@ -62,8 +101,8 @@ class CacheGraph(Graph):
                 print(f"   Cache shape: {cache[0][0].shape if len(cache) > 0 else 'N/A'}")
             self.node_caches[node_id] = cache
     
-    def get_fused_cache(self, node: Node) -> Optional[Any]:
-        """Get fused cache for a node from its spatial predecessors"""
+    def get_fused_cache(self, node: Node) -> Optional[Tuple]:
+        """Get fused cache for a node from its spatial predecessors (LatentMAS-style)"""
         print(f"\n🔄 [GRAPH] Getting fused cache for node {node.id}")
         
         if not self.use_cache_communication:
@@ -76,14 +115,18 @@ class CacheGraph(Graph):
         
         print(f"   Predecessors: {[p.id for p in node.spatial_predecessors]}")
         
-        # Collect caches from predecessors
+        # Collect caches from predecessors (graph-guided)
         sharer_caches = []
         edge_weights = []
         for pred in node.spatial_predecessors:
             if pred.id in self.node_caches:
-                print(f"   ✅ Found cache from {pred.id}")
-                sharer_caches.append(self.node_caches[pred.id])
-                edge_weights.append(1.0 / len(node.spatial_predecessors))
+                cache = self.node_caches[pred.id]
+                if cache is not None:
+                    print(f"   ✅ Found cache from {pred.id} ({len(cache)} layers)")
+                    sharer_caches.append(cache)
+                    # Use GCN edge weights if available
+                    edge_weight = self.gcn.get_edge_weight(pred.id, node.id) if hasattr(self, 'gcn') else 1.0
+                    edge_weights.append(edge_weight)
             else:
                 print(f"   ❌ No cache from {pred.id}")
         
@@ -91,16 +134,14 @@ class CacheGraph(Graph):
             print(f"   ⚠️ No predecessor caches available")
             return None
         
-        # Get receiver's own cache (if exists)
-        receiver_cache = self.node_caches.get(node.id, None)
+        # Normalize edge weights
+        total_weight = sum(edge_weights)
+        edge_weights = [w / total_weight for w in edge_weights]
         
-        # Fuse caches
-        if receiver_cache is not None:
-            print(f"   🧪 Fusing {len(sharer_caches)} caches with receiver cache")
-            return self.cache_fuser(receiver_cache, sharer_caches, edge_weights)
-        
-        print(f"   🔄 Using first sharer cache (no receiver cache yet)")
-        return sharer_caches[0]  # Use first sharer if no receiver cache
+        # Fuse caches using learnable fusion
+        print(f"   🧪 Fusing {len(sharer_caches)} caches with weights {edge_weights}")
+        fused = self.cache_fuser(sharer_caches, edge_weights)
+        return fused
     
     async def arun(self, input: Dict[str, str], num_rounds: int = 3, 
                    max_tries: int = 3, max_time: int = 600) -> List[Any]:

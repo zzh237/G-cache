@@ -4,11 +4,6 @@ Tests graph-guided KV-cache on graduate-level science multiple choice questions
 """
 import sys
 import os
-
-# Import HuggingFace datasets BEFORE adding local paths
-from datasets import load_dataset
-
-# Now add local paths (for GDesigner imports)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import argparse
@@ -25,65 +20,26 @@ from GDesigner.graph.cache_graph import CacheGraph
 from GDesigner.utils.globals import Time
 from run_gsm8k import load_result, dataloader, get_kwargs
 
-
-def normalize_answer(ans: str) -> str:
-    """Normalize answer to lowercase - matches LatentMAS"""
-    if ans is None:
-        return ""
-    return ans.strip().lower()
+# Import evaluation utilities (exact same as LatentMAS)
+from datasets.data import load_gpqa_diamond
+from datasets.utils import normalize_answer, extract_gsm8k_answer
 
 
 def load_gpqa(split: str = "test") -> List[dict]:
-    """Load GPQA Diamond dataset from HuggingFace cache"""
-    ds = load_dataset("fingertap/GPQA-Diamond", split=split)
-    
+    """Load GPQA dataset"""
+    dataset = load_gpqa_diamond(split=split)
     processed = []
-    for item in ds:
-        question = item["question"].strip()
-        answer = item["answer"].strip()
-        gold = normalize_answer(answer)
-        
+    for item in dataset:
         processed.append({
-            'task': question,
-            'answer': gold,
+            'task': item['question'],
+            'answer': item['gold'],
         })
-    
     return processed
 
 
 def extract_gpqa_answer(response: str) -> str:
-    """Extract answer from response - GPQA has full text answers"""
-    if not response:
-        return ""
-    
-    response_lower = response.lower()
-    
-    # Look for "The answer is X" pattern
-    if 'the answer is' in response_lower:
-        idx = response_lower.rfind('the answer is')
-        after = response[idx+13:].strip()
-        # Take first sentence/phrase
-        for delimiter in ['.', '\n', ',']:
-            if delimiter in after:
-                after = after.split(delimiter)[0]
-        return normalize_answer(after)
-    
-    # Look for "answer is X" or "Answer: X"
-    for pattern in ['answer is', 'answer:']:
-        if pattern in response_lower:
-            idx = response_lower.rfind(pattern)
-            after = response[idx+len(pattern):].strip()
-            for delimiter in ['.', '\n', ',']:
-                if delimiter in after:
-                    after = after.split(delimiter)[0]
-            return normalize_answer(after)
-    
-    # Last resort: take last sentence
-    sentences = response.split('.')
-    if sentences:
-        return normalize_answer(sentences[-1].strip())
-    
-    return normalize_answer(response)
+    """Extract answer from response"""
+    return normalize_answer(extract_gsm8k_answer(response))
 
 
 def parse_args():
@@ -201,8 +157,8 @@ async def main():
         
         for task_record, answer, log_prob, true_answer in zip(current_batch, raw_answers, log_probs, answers):
             predict_answer = extract_gpqa_answer(answer[0])
-            # For GPQA, check if predicted answer is contained in true answer or vice versa
-            is_solved = (predict_answer in true_answer) or (true_answer in predict_answer)
+            # Exact match - both already normalized
+            is_solved = (predict_answer == true_answer) if predict_answer and true_answer else False
             total_solved += is_solved
             total_executed += 1
             accuracy = total_solved / total_executed

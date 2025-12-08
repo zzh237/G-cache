@@ -25,9 +25,10 @@ from run_gsm8k import load_result, dataloader, get_kwargs
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="CacheDesigner with API (Free Qwen API)")
+    parser = argparse.ArgumentParser(description="CacheDesigner (supports hybrid/API/local modes)")
     parser.add_argument("--dataset_json", type=str, default="datasets/gsm8k/gsm8k.jsonl")
-    parser.add_argument("--llm_name", type=str, default="qwen-plus")  # API model name
+    parser.add_argument("--llm_name", type=str, default="hybrid_cache",
+                        help="LLM mode: hybrid_cache (small GPU+API), qwen-plus (API only), local_cache (local only)")
     parser.add_argument('--mode', type=str, default='FullConnected')
     parser.add_argument('--lr', type=float, default=0.1)
     parser.add_argument('--batch_size', type=int, default=2)
@@ -51,11 +52,16 @@ async def main():
     args = parse_args()
     
     print("="*80)
-    print("🚀 CacheDesigner with API (Free Qwen API)")
+    print("🚀 CacheDesigner")
     print("="*80)
-    print(f"Cache enabled: {args.use_cache} (simulated)")
-    print(f"Model: {args.llm_name}")
-    print(f"Backend: Qwen API (FREE)")
+    print(f"Mode: {args.llm_name}")
+    print(f"Cache enabled: {args.use_cache}")
+    if args.llm_name == "hybrid_cache":
+        print(f"Backend: Small local model (cache) + API (text)")
+    elif args.llm_name in ["qwen-plus", "qwen-turbo"]:
+        print(f"Backend: API only (text-based cache)")
+    elif args.llm_name == "local_cache":
+        print(f"Backend: Local model (real cache)")
     print("="*80)
     
     # Load dataset
@@ -69,13 +75,13 @@ async def main():
     result_dir.mkdir(parents=True, exist_ok=True)
     result_file = result_dir / f"cache_API_{args.domain}_{current_time}.json"
     
-    # Setup agents - Use API cache agents
+    # Setup agents
     if args.use_cache:
         agent_names = ['MathSolverCache'] * sum(args.agent_nums)
-        print(f"✅ Using cache-enabled agents (API + simulated cache)")
+        print(f"✅ Using cache-enabled agents")
     else:
         agent_names = ['MathSolver'] * sum(args.agent_nums)
-        print(f"📝 Using text-only agents")
+        print(f"📝 Using text-only agents (baseline)")
     
     kwargs = get_kwargs(args.mode, len(agent_names))
     
@@ -159,7 +165,7 @@ async def main():
                 "Solved": is_solved,
                 "Accuracy": accuracy,
                 "Use Cache": args.use_cache,
-                "Cache Method": "Simulated (API)" if args.use_cache else "None"
+                "Cache Method": args.llm_name if args.use_cache else "None"
             })
         
         with open(result_file, 'w', encoding='utf-8') as file:
