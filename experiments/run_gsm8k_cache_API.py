@@ -131,17 +131,12 @@ async def main():
         answers = []
         
         for record in current_batch:
-            realized_graph = copy.deepcopy(graph)
-            realized_graph.gcn = graph.gcn
-            realized_graph.mlp = graph.mlp
-            if args.use_cache:
-                realized_graph.cache_fuser = graph.cache_fuser
-            
             task = record["task"]
             answer = record["answer"]
             answers.append(answer)
             input_dict = {"task": task}
-            answer_log_probs.append(asyncio.create_task(realized_graph.arun(input_dict, args.num_rounds)))
+            # Reuse same graph for all tasks (models can't be deepcopied)
+            answer_log_probs.append(asyncio.create_task(graph.arun(input_dict, args.num_rounds)))
         
         raw_results = await asyncio.gather(*answer_log_probs)
         raw_answers, log_probs = zip(*raw_results)
