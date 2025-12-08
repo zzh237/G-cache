@@ -17,6 +17,10 @@ class GCN(torch.nn.Module):
         x = F.dropout(x, p=0.5, training=self.training)
         x = self.conv2(x, edge_index)
         return F.log_softmax(x, dim=1)
+    
+    def get_edge_weight(self, src_id, dst_id):
+        """Get edge weight between two nodes (returns 1.0 as default)"""
+        return 1.0
 
 class MLP(torch.nn.Module):
     def __init__(self, input_size, hidden_size, output_size):

@@ -43,7 +43,7 @@ def parse_args():
     parser.add_argument('--domain', type=str, default="gsm8k")
     parser.add_argument('--agent_nums', nargs='+', type=int, default=[4])
     parser.add_argument('--decision_method', type=str, default='FinalRefer')
-    parser.add_argument('--optimized_spatial', action='store_true')
+    parser.add_argument('--optimized_spatial', type=bool, default=True, help='Enable spatial optimization (required for cache training)')
     
     # Cache arguments (simulated)
     parser.add_argument('--use_cache', action='store_true', help='Enable simulated cache')
@@ -174,7 +174,7 @@ async def main():
         
         # Backprop
         total_loss = torch.mean(torch.stack(loss_list))
-        if args.optimized_spatial or args.use_cache:
+        if args.use_cache:
             optimizer.zero_grad()
             total_loss.backward()
             optimizer.step()

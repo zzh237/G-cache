@@ -380,8 +380,11 @@ class Graph(ABC):
         new_features = self.construct_new_features(input['task'])
         logits = self.gcn(new_features,self.role_adj_matrix)
         logits = self.mlp(logits)
-        self.spatial_logits = logits @ logits.t()
-        self.spatial_logits = min_max_norm(torch.flatten(self.spatial_logits))
+        spatial_logits_matrix = logits @ logits.t()
+        self.spatial_logits = torch.nn.Parameter(
+            min_max_norm(torch.flatten(spatial_logits_matrix)),
+            requires_grad=self.optimized_spatial
+        )
 
         for round in range(num_rounds):
             log_probs += self.construct_spatial_connection()

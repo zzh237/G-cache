@@ -405,3 +405,55 @@ python run_gsm8k_cache.py --llm_name Qwen/Qwen3-1.7B --use_cache --device cuda
 ```
 
 **That's it!** 🎉
+
+---
+
+## 🐛 Bug Fixes
+
+### 1. Missing `get_edge_weight` Method
+**Error:** `'GCN' object has no attribute 'get_edge_weight'`
+
+**Location:** `GDesigner/gnn/gcn.py`
+
+**Fix:** Added the missing method to the GCN class:
+```python
+def get_edge_weight(self, src_id, dst_id):
+    """Get edge weight between two nodes (returns 1.0 as default)"""
+    return 1.0
+```
+
+### 2. Gradient Flow Issue
+**Error:** `RuntimeError: element 0 of tensors does not require grad and does not have a grad_fn`
+
+**Root Cause:** The `spatial_logits` tensor was being reassigned in `arun()` method, breaking the gradient connection to the GCN parameters.
+
+**Location:** `GDesigner/graph/graph.py` (line ~327)
+
+**Fix:** Changed from:
+```python
+self.spatial_logits = min_max_norm(torch.flatten(self.spatial_logits))
+```
+
+To:
+```python
+spatial_logits_matrix = logits @ logits.t()
+self.spatial_logits = torch.nn.Parameter(
+    min_max_norm(torch.flatten(spatial_logits_matrix)),
+    requires_grad=self.optimized_spatial
+)
+```
+
+This ensures the tensor maintains gradient tracking and is properly registered as a Parameter.
+
+### 3. Training Configuration
+**Location:** `experiments/run_gsm8k_cache_API.py`
+
+**Changes:**
+- Set `optimized_spatial` default to `True` (required for cache training)
+- Simplified backprop condition to only check `args.use_cache`
+
+### Key Points
+
+1. **Gradient Flow:** The GCN → MLP → spatial_logits → log_probs chain now properly maintains gradients
+2. **Cache Training:** When `--use_cache` is enabled, both GCN and CacheFuser parameters are optimized
+3. **Edge Weights:** The `get_edge_weight` method provides default weights (can be extended for learned edge weights)
