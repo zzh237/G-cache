@@ -26,7 +26,7 @@ class HybridCacheModel:
     """
     def __init__(
         self,
-        cache_model_name: str = "Qwen/Qwen2.5-1.5B-Instruct",  # Small for cache
+        cache_model_name: str = "Qwen/Qwen3-4B",  # Qwen3: 1.7B/3B/4B/8B/14B/32B available
         api_model_name: str = "qwen-plus",  # API for text
         device: str = "cuda:0",
         use_alignment: bool = True,  # Enable LatentMAS alignment matrix
@@ -197,17 +197,11 @@ class HybridCacheModel:
         
         prompt_lengths = attention_mask.sum(dim=1).tolist()
         
-        # Handle past_key_values (LatentMAS lines 231-243)
+        # Handle past_key_values
         if past_key_values is not None:
             past_len = past_key_values[0][0].shape[-2]
             print(f"   🔗 [LOCAL-MODEL] Using cache tensors: {len(past_key_values)} layers, {past_len} tokens")
-            if past_len > 0:
-                past_mask = torch.ones(
-                    (attention_mask.shape[0], past_len),
-                    dtype=attention_mask.dtype,
-                    device=attention_mask.device,
-                )
-                attention_mask = torch.cat([past_mask, attention_mask], dim=-1)
+            # Don't modify attention_mask - model.generate() handles it automatically
         else:
             print(f"   🆕 [LOCAL-MODEL] No cache - generating from scratch")
         
