@@ -28,15 +28,15 @@ from GDesigner.graph.cache_graph import CacheGraph
 from GDesigner.tools.reader.readers import JSONLReader
 from GDesigner.utils.globals import Time, Cost, PromptTokens, CompletionTokens
 
-# Import from local datasets folder (not HuggingFace datasets)
-from datasets.gsm8k_dataset import gsm_data_process, gsm_get_predict
+# Import from local gcache_data folder (not HuggingFace datasets)
+from gcache_data.gsm8k_dataset import gsm_data_process, gsm_get_predict
 from run_gsm8k import load_result, dataloader, get_kwargs
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="CacheDesigner (supports hybrid/API/local modes)")
     # Use absolute path for dataset (relative to project root)
-    default_dataset = os.path.join(project_root, "datasets/gsm8k/gsm8k.jsonl")
+    default_dataset = os.path.join(project_root, "gcache_data/gsm8k/gsm8k.jsonl")
     parser.add_argument("--dataset_json", type=str, default=default_dataset)
     parser.add_argument("--llm_name", type=str, default="hybrid_cache",
                         help="LLM mode: hybrid_cache (small GPU+API), qwen-plus (API only), local_cache (local only)")
