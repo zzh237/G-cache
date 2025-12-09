@@ -197,11 +197,25 @@ class HybridCacheModel:
         
         prompt_lengths = attention_mask.sum(dim=1).tolist()
         
-        # Handle past_key_values
+        # Handle past_key_values and cache_position
+        cache_position = None
         if past_key_values is not None:
             past_len = past_key_values[0][0].shape[-2]
             print(f"   🔗 [LOCAL-MODEL] Using cache tensors: {len(past_key_values)} layers, {past_len} tokens")
-            # Don't modify attention_mask - model.generate() handles it automatically
+            # Create cache_position for new tokens
+            cache_position = torch.arange(
+                past_len,
+                past_len + input_ids.shape[-1],
+                dtype=torch.long,
+                device=self.device,
+            )
+            # Create attention mask for past + current tokens
+            past_mask = torch.ones(
+                (attention_mask.shape[0], past_len),
+                dtype=attention_mask.dtype,
+                device=attention_mask.device,
+            )
+            attention_mask = torch.cat([past_mask, attention_mask], dim=-1)
         else:
             print(f"   🆕 [LOCAL-MODEL] No cache - generating from scratch")
         
@@ -217,7 +231,8 @@ class HybridCacheModel:
             pad_token_id=self.tokenizer.pad_token_id,
             return_dict_in_generate=True,
             output_scores=False,
-            past_key_values=past_key_values,  # ← REAL cache usage!
+            past_key_values=past_key_values,
+            cache_position=cache_position,  # ← FIX: Tell model where new tokens go!
         )
         
         # Decode generated text (LatentMAS lines 254-260)
