@@ -90,29 +90,47 @@ class HybridCacheLLM:
         if max_length > 100000:  # Some tokenizers return huge default values
             max_length = 2048
         
+        # Synchronize CUDA to catch any pending errors
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+        
         encoded = self.tokenizer(
             prompt, 
             return_tensors="pt", 
             padding=True,
             truncation=True,  # Truncate if too long
-            max_length=max_length  # Respect model's max length
+            max_length=max_length,  # Respect model's max length
+            add_special_tokens=True  # Ensure special tokens are added correctly
         )
         print(f"   🔤 [STEP 7b] Tokenizing finished...")
         
-        # Validate token IDs before moving to device
+        # Validate and fix token IDs BEFORE any device operations
         vocab_size = self.tokenizer.vocab_size
-        input_ids_cpu = encoded["input_ids"]
-        max_token_id = input_ids_cpu.max().item()
+        input_ids_cpu = encoded["input_ids"].clone()  # Clone to avoid modifying original
+        attention_mask_cpu = encoded["attention_mask"].clone()
         
-        if max_token_id >= vocab_size:
-            print(f"   ⚠️ [ERROR] Invalid token ID {max_token_id} >= vocab_size {vocab_size}")
-            print(f"   🔧 [FIX] Clipping invalid token IDs to vocab_size-1")
+        max_token_id = input_ids_cpu.max().item()
+        min_token_id = input_ids_cpu.min().item()
+        
+        print(f"   🔍 [DEBUG] Token ID range: [{min_token_id}, {max_token_id}], vocab_size: {vocab_size}")
+        
+        if max_token_id >= vocab_size or min_token_id < 0:
+            print(f"   ⚠️ [ERROR] Invalid token IDs detected!")
+            print(f"   🔧 [FIX] Clipping to valid range [0, {vocab_size-1}]")
             input_ids_cpu = torch.clamp(input_ids_cpu, 0, vocab_size - 1)
         
-        input_ids = input_ids_cpu.to(self.hybrid_model.device)
-        print(f"   🔤 [STEP 7b] encoded input_ids finished...")
-        attention_mask = encoded["attention_mask"].to(self.hybrid_model.device)
-        print(f"   🔤 [STEP 7b] encoded attention_mask finished...")
+        # Synchronize again before moving to device
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+        
+        try:
+            input_ids = input_ids_cpu.to(self.hybrid_model.device)
+            print(f"   🔤 [STEP 7b] encoded input_ids moved to device...")
+            attention_mask = attention_mask_cpu.to(self.hybrid_model.device)
+            print(f"   🔤 [STEP 7b] encoded attention_mask moved to device...")
+        except RuntimeError as e:
+            print(f"   ❌ [ERROR] Failed to move tensors to device: {e}")
+            raise
 
         if input_ids.shape[1] >= max_length:
             print(f"   ⚠️ Prompt truncated from {len(prompt)} chars to {input_ids.shape[1]} tokens (max: {max_length})")
