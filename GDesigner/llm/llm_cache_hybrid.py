@@ -79,17 +79,23 @@ class HybridCacheLLM:
             (text_response, kv_cache)
         """
         print(f"\n📦 [STEP 7] HybridCacheLLM.agen_with_cache() - Starting cache generation")
+        
+        print(f"   💬 [STEP 7a] Converting messages to text prompt...")
         prompt = self._messages_to_text(messages)
+        print(f"   ✅ Prompt length: {len(prompt)} characters")
+        
+        print(f"   🔤 [STEP 7b] Tokenizing prompt...")
         encoded = self.tokenizer(prompt, return_tensors="pt", padding=True)
         input_ids = encoded["input_ids"].to(self.hybrid_model.device)
         attention_mask = encoded["attention_mask"].to(self.hybrid_model.device)
+        print(f"   ✅ Tokenized to {input_ids.shape[1]} tokens")
         
         # Step 1: Generate real KV-cache with small local model
         has_input_cache = past_key_values is not None
         if has_input_cache:
-            print(f"   🔗 [CACHE] Using input cache with {len(past_key_values)} layers")
+            print(f"\n   🔗 [CACHE] Using input cache with {len(past_key_values)} layers")
         else:
-            print(f"   🆕 [CACHE] No input cache - generating from scratch")
+            print(f"\n   🆕 [CACHE] No input cache - generating from scratch")
         
         print(f"\n🔗 [STEP 8] HybridCacheLLM - Calling hybrid_model.generate_latent_batch()")
         cache_kv = self.hybrid_model.generate_latent_batch(
