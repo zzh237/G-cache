@@ -78,6 +78,7 @@ class HybridCacheLLM:
         Returns:
             (text_response, kv_cache)
         """
+        print(f"\n📦 [STEP 7] HybridCacheLLM.agen_with_cache() - Starting cache generation")
         prompt = self._messages_to_text(messages)
         encoded = self.tokenizer(prompt, return_tensors="pt", padding=True)
         input_ids = encoded["input_ids"].to(self.hybrid_model.device)
@@ -90,6 +91,7 @@ class HybridCacheLLM:
         else:
             print(f"   🆕 [CACHE] No input cache - generating from scratch")
         
+        print(f"\n🔗 [STEP 8] HybridCacheLLM - Calling hybrid_model.generate_latent_batch()")
         cache_kv = self.hybrid_model.generate_latent_batch(
             input_ids,
             attention_mask,
@@ -100,6 +102,7 @@ class HybridCacheLLM:
         print(f"   ✅ [CACHE] Generated cache with {len(cache_kv)} layers, seq_len={cache_kv[0][0].shape[2]}")
         
         # Step 2: Generate text based on mode
+        print(f"\n📝 [STEP 9] HybridCacheLLM - Generating text with mode: {generation_mode}")
         if generation_mode == "hybrid":
             # HYBRID: Local model + API refinement
             print(f"   ⭐ [MODE] HYBRID (local + API refinement)")

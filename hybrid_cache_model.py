@@ -111,7 +111,7 @@ class HybridCacheModel:
         Generate KV-cache using SMALL local model
         EXACT implementation from LatentMAS models.py:313-382
         """
-        print(f"\n   🧠 [LOCAL-MODEL] Generating cache using small local model (NOT API)...")
+        print(f"\n   🧠 [STEP 8a] HybridCacheModel.generate_latent_batch() - Generating cache using small local model")
         print(f"   📊 [LOCAL-MODEL] Input: {input_ids.shape[1]} tokens, Latent steps: {latent_steps}")
         
         if attention_mask is None:
@@ -188,7 +188,7 @@ class HybridCacheModel:
         
         This is the REAL cache usage - tensors are passed directly to model.generate()
         """
-        print(f"\n   🎯 [LOCAL-MODEL] Generating text using cache TENSORS directly (NOT API)...")
+        print(f"\n   🎯 [STEP 9a] HybridCacheModel.generate_text_batch() - Generating text using cache TENSORS directly")
         
         if input_ids.dim() != 2:
             raise ValueError("input_ids must be 2D with shape [batch, seq_len]")
@@ -201,7 +201,7 @@ class HybridCacheModel:
         cache_position = None
         if past_key_values is not None:
             past_len = past_key_values[0][0].shape[-2]
-            print(f"   🔗 [LOCAL-MODEL] Using cache tensors: {len(past_key_values)} layers, {past_len} tokens")
+            print(f"   🔗 [LOCAL-MODEL] Using past key values cache tensors: {len(past_key_values)} layers, {past_len} tokens")
             # Create cache_position for new tokens
             cache_position = torch.arange(
                 past_len,
@@ -234,6 +234,7 @@ class HybridCacheModel:
             past_key_values=past_key_values,
             cache_position=cache_position,  # ← FIX: Tell model where new tokens go!
         )
+        print(f"   ✅ [LOCAL-MODEL] model.generate() complete")
         
         # Decode generated text (LatentMAS lines 254-260)
         sequences = outputs.sequences
@@ -264,7 +265,7 @@ class HybridCacheModel:
         Returns:
             (text_list, None) - API doesn't return cache
         """
-        print(f"\n   🔄 [API-CACHE] Converting cache to text context...")
+        print(f"\n   🔄 [STEP 9b] HybridCacheModel.generate_text_batch_api() - Converting cache to text context")
         print(f"   🔍 [DEBUG] past_key_values type: {type(past_key_values)}")
         
         # Inject cache context if available

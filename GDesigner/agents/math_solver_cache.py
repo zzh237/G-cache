@@ -104,6 +104,7 @@ class MathSolverCache(Node):
         3. Generate text from cache (generate_text_batch)
         4. Store cache for successors (graph-guided sharing)
         """
+        print(f"\n🎯 [STEP 3] MathSolverCache._async_execute() - Executing node {self.id}")
         graph = getattr(self, 'graph', None)
         
         # Step 1: Graph-guided cache retrieval
@@ -112,7 +113,7 @@ class MathSolverCache(Node):
         if graph and hasattr(graph, 'get_fused_cache') and self.cache_mode != "text_only":
             past_kv = graph.get_fused_cache(self)  # Fused from spatial predecessors
             has_cache = past_kv is not None
-            print(f"\n📥 [{self.id}] Received fused cache: {has_cache}")
+            print(f"\n📥 [STEP 5] MathSolverCache - Received fused cache: {has_cache}")
         
         # Step 2: Process inputs
         system_prompt, user_prompt = self._process_inputs(input, spatial_info, temporal_info, has_cache)
@@ -120,7 +121,7 @@ class MathSolverCache(Node):
         
         # Step 3: Generate with LatentMAS cache
         if hasattr(self.llm, 'agen_with_cache') and self.cache_mode != "text_only":
-            print(f"🧠 [{self.id}] Generating with LatentMAS cache (latent_steps=10)")
+            print(f"🧠 [STEP 6] MathSolverCache - Calling llm.agen_with_cache() for node {self.id}")
             # Uses: generate_latent_batch + generate_text_batch
             response, kv_cache = await self.llm.agen_with_cache(
                 messages, 
@@ -132,7 +133,7 @@ class MathSolverCache(Node):
             # Step 4: Store cache for graph successors
             if graph and hasattr(graph, 'store_node_cache'):
                 graph.store_node_cache(self.id, kv_cache)
-                print(f"💾 [{self.id}] Stored cache for {len(self.spatial_successors)} successors")
+                print(f"💾 [STEP 10] MathSolverCache - Calling store_node_cache() for {len(self.spatial_successors)} successors")
         else:
             # Fallback: text-only
             response = await self.llm.agen(messages)
