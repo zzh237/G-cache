@@ -97,6 +97,7 @@ class HybridCacheLLM:
             truncation=True,  # Truncate if too long
             max_length=max_length  # Respect model's max length
         )
+        print(f"   🔤 [STEP 7b] Tokenizing finished...")
         input_ids = encoded["input_ids"].to(self.hybrid_model.device)
         attention_mask = encoded["attention_mask"].to(self.hybrid_model.device)
         
@@ -106,19 +107,9 @@ class HybridCacheLLM:
         
         # Step 1: Generate real KV-cache with small local model
         has_input_cache = past_key_values is not None
-        
-        # Check cache compatibility - cache must be compatible with new prompt length
         if has_input_cache:
-            cache_seq_len = past_key_values[0][0].shape[2]
-            print(f"\n   🔗 [CACHE] Received past_key_values: {len(past_key_values)} layers, seq_len={cache_seq_len}")
-            
-            # CRITICAL: For LatentMAS, we can't reuse cache from different prompts
-            # The cache is tied to specific input tokens, so we must regenerate
-            print(f"   ⚠️ [CACHE] Clearing incompatible cache - each node needs fresh cache for its prompt")
-            past_key_values = None
-            has_input_cache = False
-        
-        if not has_input_cache:
+            print(f"\n   🔗 [CACHE] Using past_key_values from predecessors: {len(past_key_values)} layers")
+        else:
             print(f"\n   🆕 [CACHE] No past_key_values - generating from scratch")
         
         print(f"\n🔗 [STEP 8] HybridCacheLLM - Calling hybrid_model.generate_latent_batch()")
