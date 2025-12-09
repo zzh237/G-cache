@@ -90,19 +90,40 @@ class HybridCacheLLM:
         if max_length > 100000:  # Some tokenizers return huge default values
             max_length = 2048
         
-        # Synchronize CUDA to catch any pending errors
+        # CRITICAL: Clear CUDA cache and synchronize to avoid stale state from previous nodes
         if torch.cuda.is_available():
-            torch.cuda.synchronize()
+            try:
+                torch.cuda.synchronize()
+                torch.cuda.empty_cache()  # Clear cached memory
+                print(f"   🧹 [STEP 7b] Cleared CUDA cache")
+            except Exception as e:
+                print(f"   ⚠️ [WARNING] CUDA sync/clear failed: {e}")
         
-        encoded = self.tokenizer(
-            prompt, 
-            return_tensors="pt", 
-            padding=True,
-            truncation=True,  # Truncate if too long
-            max_length=max_length,  # Respect model's max length
-            add_special_tokens=True  # Ensure special tokens are added correctly
-        )
-        print(f"   🔤 [STEP 7b] Tokenizing finished...")
+        # Tokenize on CPU to avoid CUDA issues
+        try:
+            encoded = self.tokenizer(
+                prompt, 
+                return_tensors="pt", 
+                padding=True,
+                truncation=True,  # Truncate if too long
+                max_length=max_length,  # Respect model's max length
+                add_special_tokens=True  # Ensure special tokens are added correctly
+            )
+            print(f"   🔤 [STEP 7b] Tokenizing finished...")
+        except Exception as e:
+            print(f"   ❌ [ERROR] Tokenization failed: {e}")
+            print(f"   🔧 [FIX] Retrying with shorter prompt...")
+            # Truncate prompt and retry
+            prompt = prompt[:max_length * 4]  # Rough estimate: 4 chars per token
+            encoded = self.tokenizer(
+                prompt, 
+                return_tensors="pt", 
+                padding=True,
+                truncation=True,
+                max_length=max_length,
+                add_special_tokens=True
+            )
+            print(f"   ✅ [FIX] Tokenization succeeded with truncated prompt")
         
         # Validate and fix token IDs BEFORE any device operations
         vocab_size = self.tokenizer.vocab_size
