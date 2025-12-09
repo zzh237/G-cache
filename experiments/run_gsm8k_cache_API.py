@@ -6,7 +6,7 @@ import sys
 import os
 
 # Use only GPUs 1 and 2
-os.environ["CUDA_VISIBLE_DEVICES"] = "1,2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 # Add parent directory to path FIRST (before any imports)
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
