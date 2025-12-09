@@ -90,84 +90,28 @@ class HybridCacheLLM:
         if max_length > 100000:  # Some tokenizers return huge default values
             max_length = 2048
         
-        # CRITICAL: Clear CUDA cache and synchronize to avoid stale state from previous nodes
-        if torch.cuda.is_available():
-            try:
-                torch.cuda.synchronize()
-                torch.cuda.empty_cache()  # Clear cached memory
-                print(f"   🧹 [STEP 7b] Cleared CUDA cache")
-            except Exception as e:
-                print(f"   ⚠️ [WARNING] CUDA sync/clear failed: {e}")
-        
-        # Tokenize on CPU to avoid CUDA issues
-        try:
-            encoded = self.tokenizer(
-                prompt, 
-                return_tensors="pt", 
-                padding=True,
-                truncation=True,  # Truncate if too long
-                max_length=max_length,  # Respect model's max length
-                add_special_tokens=True  # Ensure special tokens are added correctly
-            )
-            print(f"   🔤 [STEP 7b] Tokenizing finished...")
-        except Exception as e:
-            print(f"   ❌ [ERROR] Tokenization failed: {e}")
-            print(f"   🔧 [FIX] Retrying with shorter prompt...")
-            # Truncate prompt and retry
-            prompt = prompt[:max_length * 4]  # Rough estimate: 4 chars per token
-            encoded = self.tokenizer(
-                prompt, 
-                return_tensors="pt", 
-                padding=True,
-                truncation=True,
-                max_length=max_length,
-                add_special_tokens=True
-            )
-            print(f"   ✅ [FIX] Tokenization succeeded with truncated prompt")
-        
-        # Validate and fix token IDs BEFORE any device operations
-        vocab_size = self.tokenizer.vocab_size
-        input_ids_cpu = encoded["input_ids"].clone()  # Clone to avoid modifying original
-        attention_mask_cpu = encoded["attention_mask"].clone()
-        
-        max_token_id = input_ids_cpu.max().item()
-        min_token_id = input_ids_cpu.min().item()
-        
-        print(f"   🔍 [DEBUG] Token ID range: [{min_token_id}, {max_token_id}], vocab_size: {vocab_size}")
-        
-        if max_token_id >= vocab_size or min_token_id < 0:
-            print(f"   ⚠️ [ERROR] Invalid token IDs detected!")
-            print(f"   🔧 [FIX] Clipping to valid range [0, {vocab_size-1}]")
-            input_ids_cpu = torch.clamp(input_ids_cpu, 0, vocab_size - 1)
-        
-        # Synchronize again before moving to device
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
-        
-        try:
-            input_ids = input_ids_cpu.to(self.hybrid_model.device)
-            print(f"   🔤 [STEP 7b] encoded input_ids moved to device...")
-            attention_mask = attention_mask_cpu.to(self.hybrid_model.device)
-            print(f"   🔤 [STEP 7b] encoded attention_mask moved to device...")
-        except RuntimeError as e:
-            print(f"   ❌ [ERROR] Failed to move tensors to device: {e}")
-            raise
+        encoded = self.tokenizer(
+            prompt, 
+            return_tensors="pt", 
+            padding=True,
+            truncation=True,  # Truncate if too long
+            max_length=max_length  # Respect model's max length
+        )
+        print(f"   🔤 [STEP 7b] Tokenizing finished...")
+        input_ids = encoded["input_ids"].to(self.hybrid_model.device)
+        print(f"   🔤 [STEP 7b] encoded input_ids finished...")
+        attention_mask = encoded["attention_mask"].to(self.hybrid_model.device)
+        print(f"   🔤 [STEP 7b] encoded attention_mask finished...")
 
         if input_ids.shape[1] >= max_length:
             print(f"   ⚠️ Prompt truncated from {len(prompt)} chars to {input_ids.shape[1]} tokens (max: {max_length})")
         print(f"   ✅ Tokenized to {input_ids.shape[1]} tokens")
         
-        # Step 1: Check cache compatibility
+        # Step 1: Generate real KV-cache with small local model
         has_input_cache = past_key_values is not None
-        
         if has_input_cache:
-            cache_seq_len = past_key_values[0][0].shape[2]
-            print(f"\n   🔗 [CACHE] Received past_key_values: {len(past_key_values)} layers, seq_len={cache_seq_len}")
-            print(f"   ⚠️ [CACHE] Clearing cache - each node generates fresh cache for its unique prompt")
-            past_key_values = None
-            has_input_cache = False
-        
-        if not has_input_cache:
+            print(f"\n   🔗 [CACHE] Using past_key_values from predecessors: {len(past_key_values)} layers")
+        else:
             print(f"\n   🆕 [CACHE] No past_key_values - generating from scratch")
         
         print(f"\n🔗 [STEP 8] HybridCacheLLM - Calling hybrid_model.generate_latent_batch()")
