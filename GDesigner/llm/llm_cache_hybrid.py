@@ -22,10 +22,10 @@ class HybridCacheLLM:
     Perfect for: Free API + small GPU (4GB)
     """
     def __init__(self, 
-                 cache_model_name: str = "Qwen/Qwen2.5-1.5B-Instruct",  # Larger model for better cache
-                 api_model_name: str = "qwen-flash",  # Changed to qwen-flash (faster & cheaper)
-                 device: str = "cuda:0",
-                 device_map: str = "auto"):  # Auto-distribute across GPUs
+                 cache_model_name: str = "Qwen/Qwen3-4B",  # Qwen3 4B
+                 api_model_name: str = "qwen-flash",
+                 device: str = "cuda:1",
+                 device_map: str = "auto"):  # Auto uses available GPUs
         self.model_name = api_model_name
         
         # Initialize hybrid model
