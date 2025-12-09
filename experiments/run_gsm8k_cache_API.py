@@ -4,10 +4,15 @@ Simulates cache for testing structure without GPU
 """
 import sys
 import os
+
+# Use only GPUs 1 and 2
+os.environ["CUDA_VISIBLE_DEVICES"] = "1,2"
+
 # Add parent directory to path FIRST (before any imports)
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_root)
 print(f"[DEBUG] Added to sys.path: {project_root}")
+print(f"[DEBUG] Using GPUs: {os.environ['CUDA_VISIBLE_DEVICES']}")
 
 import argparse
 import json
