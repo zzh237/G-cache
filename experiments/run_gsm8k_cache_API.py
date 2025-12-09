@@ -194,11 +194,20 @@ async def main():
             json.dump(data, file, indent=4)
         
         # Backprop
-        total_loss = torch.mean(torch.stack(loss_list))
-        if args.use_cache:
-            optimizer.zero_grad()
-            total_loss.backward()
-            optimizer.step()
+        if loss_list:
+            total_loss = torch.mean(torch.stack(loss_list))
+            if args.use_cache and total_loss.requires_grad:
+                try:
+                    optimizer.zero_grad()
+                    total_loss.backward()
+                    # Clip gradients to prevent NaN/Inf
+                    torch.nn.utils.clip_grad_norm_(params, max_norm=1.0)
+                    optimizer.step()
+                except RuntimeError as e:
+                    print(f"⚠️ Backprop error: {e}")
+                    print(f"Skipping optimization step")
+        else:
+            total_loss = torch.tensor(0.0)
         
         print(f"⏱️  Batch time: {time.time() - start_ts:.3f}s")
         print(f"📊 Accuracy: {accuracy:.4f}")
