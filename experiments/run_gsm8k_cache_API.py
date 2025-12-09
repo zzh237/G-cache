@@ -136,6 +136,11 @@ async def main():
     total_solved, total_executed = 0, 0
     
     for i_batch in range(num_batches):
+        # Clear CUDA cache to prevent memory corruption
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+        
         print(f"\n{'='*80}")
         print(f"Batch {i_batch+1}/{num_batches}")
         print(f"{'='*80}")
