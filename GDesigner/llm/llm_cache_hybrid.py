@@ -98,7 +98,18 @@ class HybridCacheLLM:
             max_length=max_length  # Respect model's max length
         )
         print(f"   🔤 [STEP 7b] Tokenizing finished...")
-        input_ids = encoded["input_ids"].to(self.hybrid_model.device)
+        
+        # Validate token IDs before moving to device
+        vocab_size = self.tokenizer.vocab_size
+        input_ids_cpu = encoded["input_ids"]
+        max_token_id = input_ids_cpu.max().item()
+        
+        if max_token_id >= vocab_size:
+            print(f"   ⚠️ [ERROR] Invalid token ID {max_token_id} >= vocab_size {vocab_size}")
+            print(f"   🔧 [FIX] Clipping invalid token IDs to vocab_size-1")
+            input_ids_cpu = torch.clamp(input_ids_cpu, 0, vocab_size - 1)
+        
+        input_ids = input_ids_cpu.to(self.hybrid_model.device)
         print(f"   🔤 [STEP 7b] encoded input_ids finished...")
         attention_mask = encoded["attention_mask"].to(self.hybrid_model.device)
         print(f"   🔤 [STEP 7b] encoded attention_mask finished...")
@@ -107,11 +118,17 @@ class HybridCacheLLM:
             print(f"   ⚠️ Prompt truncated from {len(prompt)} chars to {input_ids.shape[1]} tokens (max: {max_length})")
         print(f"   ✅ Tokenized to {input_ids.shape[1]} tokens")
         
-        # Step 1: Generate real KV-cache with small local model
+        # Step 1: Check cache compatibility
         has_input_cache = past_key_values is not None
+        
         if has_input_cache:
-            print(f"\n   🔗 [CACHE] Using past_key_values from predecessors: {len(past_key_values)} layers")
-        else:
+            cache_seq_len = past_key_values[0][0].shape[2]
+            print(f"\n   🔗 [CACHE] Received past_key_values: {len(past_key_values)} layers, seq_len={cache_seq_len}")
+            print(f"   ⚠️ [CACHE] Clearing cache - each node generates fresh cache for its unique prompt")
+            past_key_values = None
+            has_input_cache = False
+        
+        if not has_input_cache:
             print(f"\n   🆕 [CACHE] No past_key_values - generating from scratch")
         
         print(f"\n🔗 [STEP 8] HybridCacheLLM - Calling hybrid_model.generate_latent_batch()")
