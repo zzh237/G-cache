@@ -99,8 +99,10 @@ class HybridCacheLLM:
         )
         print(f"   🔤 [STEP 7b] Tokenizing finished...")
         input_ids = encoded["input_ids"].to(self.hybrid_model.device)
+        print(f"   🔤 [STEP 7b] encoded input_ids finished...")
         attention_mask = encoded["attention_mask"].to(self.hybrid_model.device)
-        
+        print(f"   🔤 [STEP 7b] encoded attention_mask finished...")
+
         if input_ids.shape[1] >= max_length:
             print(f"   ⚠️ Prompt truncated from {len(prompt)} chars to {input_ids.shape[1]} tokens (max: {max_length})")
         print(f"   ✅ Tokenized to {input_ids.shape[1]} tokens")
