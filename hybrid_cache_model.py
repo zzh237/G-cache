@@ -198,16 +198,9 @@ class HybridCacheModel:
         prompt_lengths = attention_mask.sum(dim=1).tolist()
         
         # Handle past_key_values (LatentMAS lines 231-243)
-        cache_position = None
         if past_key_values is not None:
             past_len = past_key_values[0][0].shape[-2]
             print(f"   🔗 [LOCAL-MODEL] Using cache tensors: {len(past_key_values)} layers, {past_len} tokens")
-            cache_position = torch.arange(
-                past_len,
-                past_len + input_ids.shape[-1],
-                dtype=torch.long,
-                device=self.device,
-            )
             if past_len > 0:
                 past_mask = torch.ones(
                     (attention_mask.shape[0], past_len),
@@ -231,7 +224,6 @@ class HybridCacheModel:
             return_dict_in_generate=True,
             output_scores=False,
             past_key_values=past_key_values,  # ← REAL cache usage!
-            cache_position=cache_position,
         )
         
         # Decode generated text (LatentMAS lines 254-260)
