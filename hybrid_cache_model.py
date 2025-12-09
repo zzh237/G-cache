@@ -201,7 +201,7 @@ class HybridCacheModel:
         cache_position = None
         if past_key_values is not None:
             past_len = past_key_values[0][0].shape[-2]
-            print(f"   🔗 [LOCAL-MODEL] Using past key values cache tensors: {len(past_key_values)} layers, {past_len} tokens")
+            print(f"   🔗 [LOCAL-MODEL of 9a] Using past key values cache tensors: {len(past_key_values)} layers, {past_len} tokens")
             # Create cache_position for new tokens
             cache_position = torch.arange(
                 past_len,
@@ -217,10 +217,10 @@ class HybridCacheModel:
             )
             attention_mask = torch.cat([past_mask, attention_mask], dim=-1)
         else:
-            print(f"   🆕 [LOCAL-MODEL] No cache - generating from scratch")
+            print(f"   🆕 [LOCAL-MODEL of 9a] No cache - generating from scratch")
         
         # Generate with cache tensors (LatentMAS lines 244-253)
-        print(f"   ⚙️ [LOCAL-MODEL] Calling model.generate() with cache tensors...")
+        print(f"   ⚙️ [LOCAL-MODEL of 9a] Calling model.generate() with cache tensors...")
         outputs = self.cache_model.generate(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -234,7 +234,7 @@ class HybridCacheModel:
             past_key_values=past_key_values,
             cache_position=cache_position,  # ← FIX: Tell model where new tokens go!
         )
-        print(f"   ✅ [LOCAL-MODEL] model.generate() complete")
+        print(f"   ✅ [LOCAL-MODEL of 9a] model.generate() complete")
         
         # Decode generated text (LatentMAS lines 254-260)
         sequences = outputs.sequences

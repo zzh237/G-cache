@@ -93,9 +93,9 @@ class HybridCacheLLM:
         # Step 1: Generate real KV-cache with small local model
         has_input_cache = past_key_values is not None
         if has_input_cache:
-            print(f"\n   🔗 [CACHE] Using input cache with {len(past_key_values)} layers")
+            print(f"\n   🔗 [CACHE] Using past_key_values from predecessors: {len(past_key_values)} layers")
         else:
-            print(f"\n   🆕 [CACHE] No input cache - generating from scratch")
+            print(f"\n   🆕 [CACHE] No past_key_values - generating from scratch")
         
         print(f"\n🔗 [STEP 8] HybridCacheLLM - Calling hybrid_model.generate_latent_batch()")
         cache_kv = self.hybrid_model.generate_latent_batch(
@@ -111,7 +111,7 @@ class HybridCacheLLM:
         print(f"\n📝 [STEP 9] HybridCacheLLM - Generating text with mode: {generation_mode}")
         if generation_mode == "hybrid":
             # HYBRID: Local model + API refinement
-            print(f"   ⭐ [MODE] HYBRID (local + API refinement)")
+            print(f"   ⭐ [MODE] HYBRID - Calling generate_text_batch_hybrid()")
             text, cache_kv = await self.hybrid_model.generate_text_batch_hybrid(
                 input_ids,
                 messages,
@@ -121,7 +121,7 @@ class HybridCacheLLM:
             )
         elif generation_mode == "local":
             # LOCAL: Local model only (real cache usage)
-            print(f"   🖥️  [MODE] LOCAL (local model only, real cache)")
+            print(f"   🖥️  [MODE] LOCAL - Calling generate_text_batch()")
             text, cache_kv = self.hybrid_model.generate_text_batch(
                 input_ids,
                 attention_mask=attention_mask,
@@ -130,7 +130,7 @@ class HybridCacheLLM:
             )
         else:  # api_hint
             # API_HINT: API with text hint
-            print(f"   🌐 [MODE] API_HINT (API with text hint)")
+            print(f"   🌐 [MODE] API_HINT - Calling generate_text_batch_api()")
             text, _ = await self.hybrid_model.generate_text_batch_api(
                 messages,
                 past_key_values=cache_kv,
