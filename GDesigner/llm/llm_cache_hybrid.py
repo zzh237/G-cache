@@ -85,9 +85,23 @@ class HybridCacheLLM:
         print(f"   ✅ Prompt length: {len(prompt)} characters")
         
         print(f"   🔤 [STEP 7b] Tokenizing prompt...")
-        encoded = self.tokenizer(prompt, return_tensors="pt", padding=True)
+        # Get model's max length (default to 2048 if not available)
+        max_length = getattr(self.tokenizer, 'model_max_length', 2048)
+        if max_length > 100000:  # Some tokenizers return huge default values
+            max_length = 2048
+        
+        encoded = self.tokenizer(
+            prompt, 
+            return_tensors="pt", 
+            padding=True,
+            truncation=True,  # Truncate if too long
+            max_length=max_length  # Respect model's max length
+        )
         input_ids = encoded["input_ids"].to(self.hybrid_model.device)
         attention_mask = encoded["attention_mask"].to(self.hybrid_model.device)
+        
+        if input_ids.shape[1] >= max_length:
+            print(f"   ⚠️ Prompt truncated from {len(prompt)} chars to {input_ids.shape[1]} tokens (max: {max_length})")
         print(f"   ✅ Tokenized to {input_ids.shape[1]} tokens")
         
         # Step 1: Generate real KV-cache with small local model

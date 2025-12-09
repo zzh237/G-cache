@@ -107,7 +107,7 @@ class MathSolverCache(Node):
         print(f"\n🎯 [STEP 3] MathSolverCache._async_execute() - Executing node {self.id}")
         graph = getattr(self, 'graph', None)
         
-        # Step 1: Graph-guided cache retrieval
+        # Step 1: Graph-guided cache retrieval (get KV-cache from predecessors)
         past_kv = None
         has_cache = False
         if graph and hasattr(graph, 'get_fused_cache') and self.cache_mode != "text_only":
@@ -115,13 +115,15 @@ class MathSolverCache(Node):
             has_cache = past_kv is not None
             print(f"\n📥 [STEP 5] MathSolverCache - Received fused cache: {has_cache}")
         
-        # Step 2: Process inputs
+        # Step 2: Process inputs (build prompt from task + spatial/temporal context)
+        print(f"\n📝 [STEP 5a] MathSolverCache._process_inputs() - Building prompt with context")
         system_prompt, user_prompt = self._process_inputs(input, spatial_info, temporal_info, has_cache)
         messages = [{'role': 'system', 'content': system_prompt}, {'role': 'user', 'content': user_prompt}]
+        print(f"   ✅ Built messages: system ({len(system_prompt)} chars) + user ({len(user_prompt)} chars)")
         
-        # Step 3: Generate with LatentMAS cache
+        # Step 3: Generate with LatentMAS cache (goal: create reasoning cache + generate response)
         if hasattr(self.llm, 'agen_with_cache') and self.cache_mode != "text_only":
-            print(f"🧠 [STEP 6] MathSolverCache - Calling llm.agen_with_cache() for node {self.id}")
+            print(f"\n🧠 [STEP 6] MathSolverCache - Calling llm.agen_with_cache() (Goal: Generate reasoning cache + text response)")
             # Uses: generate_latent_batch + generate_text_batch
             response, kv_cache = await self.llm.agen_with_cache(
                 messages, 
@@ -130,10 +132,10 @@ class MathSolverCache(Node):
                 generation_mode=self.generation_mode,  # Pass generation mode
             )
             
-            # Step 4: Store cache for graph successors
+            # Step 4: Store cache for graph successors (save for next nodes to use)
             if graph and hasattr(graph, 'store_node_cache'):
                 graph.store_node_cache(self.id, kv_cache)
-                print(f"💾 [STEP 10] MathSolverCache - Calling store_node_cache() for {len(self.spatial_successors)} successors")
+                print(f"\n💾 [STEP 10] MathSolverCache - Calling store_node_cache() for {len(self.spatial_successors)} successors")
         else:
             # Fallback: text-only
             response = await self.llm.agen(messages)

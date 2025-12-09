@@ -330,7 +330,7 @@ class HybridCacheModel:
         print(f"\n   ⭐ [HYBRID] Using TRUE hybrid approach...")
         
         # Step 1: Generate with local model using REAL cache
-        print(f"   📍 [HYBRID] Step 1: Local model with real cache tensors")
+        print(f"   📍 [HYBRID] Local model with real cache tensors, past_key_values, call generate_text_batch")
         local_text, new_cache = self.generate_text_batch(
             input_ids,
             attention_mask=attention_mask,
