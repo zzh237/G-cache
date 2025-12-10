@@ -130,11 +130,27 @@ class MathSolverCache(Node):
         print(f"\n📝 [STEP 5a] MathSolverCache._process_inputs() - Building prompt with context")
         print(f"   🔍 Spatial info from {len(spatial_info)} agents: {list(spatial_info.keys())}")
         print(f"   🔍 Temporal info from {len(temporal_info)} agents: {list(temporal_info.keys())}")
+        
+        # Calculate original question length
+        original_question = self.prompt_set.get_answer_prompt(question=input["task"], role=self.role)
+        original_len = len(original_question)
+        
         system_prompt, user_prompt = self._process_inputs(input, spatial_info, temporal_info, has_cache)
         messages = [{'role': 'system', 'content': system_prompt}, {'role': 'user', 'content': user_prompt}]
+        
+        # Detailed breakdown
+        print(f"   📊 Prompt composition breakdown:")
+        print(f"      - Original question: {original_len} chars")
+        for agent_id, info in spatial_info.items():
+            print(f"      - From agent {agent_id}: +{len(info['output'])} chars")
+        for agent_id, info in temporal_info.items():
+            print(f"      - From agent {agent_id} (temporal): +{len(info['output'])} chars")
+        print(f"      - Total user prompt: {len(user_prompt)} chars")
         print(f"   ✅ Built messages: system ({len(system_prompt)} chars) + user ({len(user_prompt)} chars)")
         if spatial_info:
             print(f"   💬 Spatial context includes outputs from: {', '.join(spatial_info.keys())}")
+        if temporal_info:
+            print(f"   💬 Temporal context includes outputs from: {', '.join(temporal_info.keys())}")
         
         # Step 3: Generate with LatentMAS cache (goal: create reasoning cache + generate response)
         if hasattr(self.llm, 'agen_with_cache') and self.cache_mode != "text_only":

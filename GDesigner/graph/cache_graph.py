@@ -177,6 +177,15 @@ class CacheGraph(Graph):
         
         # Fuse caches using learnable fusion
         print(f"   🧪 Fusing {len(sharer_caches)} caches with weights {edge_weights}")
+        print(f"   📊 Cache fusion breakdown:")
+        for i, pred in enumerate(node.spatial_predecessors):
+            if pred.id in self.node_caches and self.node_caches[pred.id]:
+                cache = self.node_caches[pred.id]
+                if isinstance(cache, tuple):
+                    seq_len = cache[0][0].shape[2]
+                else:
+                    seq_len = len(cache)
+                print(f"      - Cache {i+1} from {pred.id}: weight={edge_weights[i]:.2f}, seq_len={seq_len}")
         fused = self.cache_fuser(sharer_caches, edge_weights)
         
         if fused is None:
