@@ -25,23 +25,25 @@ class CacheFuser(nn.Module):
         
         # Check cache type: tensor (local model) or dict (API)
         first_cache = sharer_caches[0]
-        print(f"   🔍 Cache type debug: {type(first_cache)}")
-        print(f"   🔍 Has key_cache: {hasattr(first_cache, 'key_cache')}")
-        print(f"   🔍 Has value_cache: {hasattr(first_cache, 'value_cache')}")
-        print(f"   🔍 Is tuple: {isinstance(first_cache, tuple)}")
-        print(f"   🔍 Is dict: {isinstance(first_cache, dict)}")
+        print(f"   🔍 Cache type: {type(first_cache).__name__}")
         
         # Text-based cache (API mode)
         if isinstance(first_cache, dict):
             return self._fuse_text_caches(sharer_caches, edge_weights)
         
-        # DynamicCache (HuggingFace cache object) - convert to tuple
-        elif hasattr(first_cache, 'key_cache') and hasattr(first_cache, 'value_cache'):
+        # DynamicCache (HuggingFace cache object) - check by class name or __len__
+        elif type(first_cache).__name__ == 'DynamicCache' or (hasattr(first_cache, '__len__') and not isinstance(first_cache, (tuple, list))):
             print(f"   🔄 Converting DynamicCache to tuple format...")
+            print(f"   🔍 DynamicCache attributes: {dir(first_cache)[:10]}...")  # Show first 10 attributes
             converted_caches = []
             for cache in sharer_caches:
-                # DynamicCache has .key_cache and .value_cache as lists of tensors
-                tuple_cache = tuple((k, v) for k, v in zip(cache.key_cache, cache.value_cache))
+                # DynamicCache can be indexed like cache[layer_idx] -> (key, value)
+                # Or accessed via to_legacy_cache() method
+                if hasattr(cache, 'to_legacy_cache'):
+                    tuple_cache = cache.to_legacy_cache()
+                else:
+                    # Try direct indexing
+                    tuple_cache = tuple((cache[i][0], cache[i][1]) for i in range(len(cache)))
                 converted_caches.append(tuple_cache)
             return self._fuse_tensor_caches(converted_caches, edge_weights, tau)
         
