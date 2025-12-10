@@ -128,21 +128,23 @@ class HybridCacheLLM:
         
         # Step 2: Generate text based on mode
         print(f"\n📝 [STEP 9] HybridCacheLLM - Generating text with mode: {generation_mode}")
-        
+        print(f"   🔍 [STEP 9] Input parameters (shared by all modes):")
         print(f"      - input_ids: shape {input_ids.shape}, type {type(input_ids)}, batch_size={input_ids.shape[0]}")
         print(f"      - attention_mask: shape {attention_mask.shape if attention_mask is not None else 'None'}")
         print(f"      - messages: type {type(messages)}, length {len(messages)} (chat history, NOT batch)")
         roles = [m['role'] for m in messages]
         print(f"      - messages structure: {roles}")
-        msg_role = messages[0]['role']
-        msg_preview = messages[0]['content'][:80]
-        print(f"      - messages[0] role: {msg_role}, content preview: {msg_preview}...")
-            
+        msg0_role = messages[0]['role']
+        msg0_preview = messages[0]['content'][:80]
+        print(f"      - messages[0] role: {msg0_role}, content preview: {msg0_preview}...")
+        if len(messages) > 1:
+            msg1_role = messages[1]['role']
+            msg1_preview = messages[1]['content'][:80]
+            print(f"      - messages[1] role: {msg1_role}, content preview: {msg1_preview}...")
         
         if generation_mode == "hybrid":
             # HYBRID: Local model + API refinement
             print(f"   ⭐ [MODE] HYBRID - Calling generate_text_batch_hybrid()")
-            print(f"   🔍 [HYBRID] Input parameters to generate_text_batch_hybrid():")
             text, cache_kv = await self.hybrid_model.generate_text_batch_hybrid(
                 input_ids,
                 messages,

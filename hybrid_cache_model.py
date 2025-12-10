@@ -340,10 +340,14 @@ class HybridCacheModel:
         
         # Step 2: Use local output as context for API
         print(f"   📍 [HYBRID] Step 2: API refinement with local output as context")
+        print(f"   🔍 [HYBRID] Local model output preview: {local_text[0][:150]}...")
         messages = messages.copy()
         if messages and messages[-1].get("role") == "user":
+            original_user_msg = messages[-1]["content"]
+            print(f"   🔍 [HYBRID] Original user message: {original_user_msg[:100]}...")
             context = f"Previous reasoning from local model:\n{local_text[0]}\n\n"
             messages[-1]["content"] = context + messages[-1]["content"]
+            print(f"   🔍 [HYBRID] Modified user message (with local context): {messages[-1]['content'][:150]}...")
         
         # Step 3: Get high-quality output from API
         api_text, _ = await self.generate_text_batch_api(
