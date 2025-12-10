@@ -234,6 +234,7 @@ class HybridCacheModel:
             past_key_values=past_key_values,
             cache_position=cache_position,  # ← FIX: Tell model where new tokens go!
         )
+        print(f"   ⚙️ [LOCAL-MODEL of 9a] {outputs.past_key_values[0][0].shape[2]} tokens generated")
         print(f"   ✅ [LOCAL-MODEL of 9a] model.generate() complete")
         
         # Decode generated text (LatentMAS lines 254-260)

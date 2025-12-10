@@ -140,7 +140,9 @@ class HybridCacheLLM:
         if len(messages) > 1:
             msg1_role = messages[1]['role']
             msg1_preview = messages[1]['content'][:80]
+            msg1_full_len = len(messages[1]['content'])
             print(f"      - messages[1] role: {msg1_role}, content preview: {msg1_preview}...")
+            print(f"      - messages[1] full length: {msg1_full_len} chars (may contain few-shot examples + actual question)")
         
         if generation_mode == "hybrid":
             # HYBRID: Local model + API refinement
