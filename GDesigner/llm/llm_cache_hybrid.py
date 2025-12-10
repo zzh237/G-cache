@@ -150,7 +150,7 @@ class HybridCacheLLM:
                 messages,
                 attention_mask=attention_mask,
                 past_key_values=cache_kv,
-                max_tokens=kwargs.get("max_tokens", 256)
+                max_tokens=kwargs.get("max_tokens", 1024)
             )
         elif generation_mode == "local":
             # LOCAL: Local model only (real cache usage)
@@ -160,7 +160,7 @@ class HybridCacheLLM:
                 input_ids,
                 attention_mask=attention_mask,
                 past_key_values=cache_kv,
-                max_new_tokens=kwargs.get("max_tokens", 256)
+                max_new_tokens=kwargs.get("max_tokens", 1024)
             )
         else:  # api_hint
             # API_HINT: API with text hint
@@ -169,7 +169,7 @@ class HybridCacheLLM:
             text, _ = await self.hybrid_model.generate_text_batch_api(
                 messages,
                 past_key_values=cache_kv,
-                max_tokens=kwargs.get("max_tokens", 256)
+                max_tokens=kwargs.get("max_tokens", 1024)
             )
         
         print(f"\n✅ [STEP 9 COMPLETE] Text generation finished using cache!")

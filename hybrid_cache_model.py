@@ -266,7 +266,7 @@ class HybridCacheModel:
         Returns:
             (text_list, None) - API doesn't return cache
         """
-        print(f"\n   🔄 [STEP 9b] HybridCacheModel.generate_text_batch_api() - Converting cache to text context")
+        print(f"\n   🔄 [STEP 9b] HybridCacheModel.generate_text_batch_api() - Converting cache converted text to text context using API")
         
         # Inject cache context if available
         if past_key_values:
@@ -340,15 +340,16 @@ class HybridCacheModel:
         )
         
         # Step 2: Use local output as context for API
-        print(f"   📍 [HYBRID] Step 2: API refinement with local output as context")
-        print(f"   🔍 [HYBRID] Local model output preview: {local_text[0][:150]}...")
+        print(f"   📍 [HYBRID] Step 2: API refinement with cache converted text as context")
+        print(f"   🔍 [HYBRID] Cache converted text preview: {local_text[0][:150]}...")
         messages = messages.copy()
         if messages and messages[-1].get("role") == "user":
             original_user_msg = messages[-1]["content"]
             print(f"   🔍 [HYBRID] Original user message: {original_user_msg[:100]}...")
             context = f"Previous reasoning from local model:\n{local_text[0]}\n\n"
+            print(f"   🔍 [HYBRID] cache converted text length: {len(context)} chars, preview: {context[:100]}...")
             messages[-1]["content"] = context + messages[-1]["content"]
-            print(f"   🔍 [HYBRID] Modified user message (with local context): {messages[-1]['content'][:150]}...")
+            print(f"   🔍 [HYBRID] Modified user message (with cache converted text): {messages[-1]['content'][:150]}...")
         
         # Step 3: Get high-quality output from API
         api_text, _ = await self.generate_text_batch_api(

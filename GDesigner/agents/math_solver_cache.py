@@ -111,17 +111,18 @@ class MathSolverCache(Node):
         3. Generate text from cache (generate_text_batch)
         4. Store cache for successors (graph-guided sharing)
         """
-        print(f"\n🎯 [STEP 3] MathSolverCache._async_execute() - Executing node {self.id}")
         graph = getattr(self, 'graph', None)
+        all_nodes = ', '.join(graph.nodes.keys()) if graph else 'unknown'
+        print(f"\n🎯 [STEP 3] MathSolverCache._async_execute() - Executing node {self.id} (graph nodes: [{all_nodes}])")
         
         # Step 1: Graph-guided cache retrieval (get KV-cache from predecessors)
         past_kv = None
         has_cache = False
         if graph and hasattr(graph, 'get_fused_cache') and self.cache_mode != "text_only":
-            print(f"\n🎯 [STEP 4] call graph.get_fused_cache()")
+            print(f"\n🎯 [STEP 4] Calling graph.get_fused_cache() for node {self.id}")
             past_kv = graph.get_fused_cache(self)  # Fused from spatial predecessors
             has_cache = past_kv is not None
-            print(f"\n📥 [STEP 5] MathSolverCache - Received fused cache: {has_cache}")
+            print(f"\n📥 [STEP 5] MathSolverCache - Received fused cache called as past_kv: {has_cache}")
             if has_cache:
                 print(f"   📊 Cache shape: {len(past_kv)} layers, first layer shape: {past_kv[0][0].shape if past_kv else 'N/A'}")
         
@@ -149,14 +150,14 @@ class MathSolverCache(Node):
             # Step 4: Store cache for graph successors (save for next nodes to use)
             if graph and hasattr(graph, 'store_node_cache'):
                 graph.store_node_cache(self.id, kv_cache)
-                print(f"\n💾 [STEP 10] MathSolverCache - Calling store_node_cache() for {len(self.spatial_successors)} successors")
+                print(f"\n💾 [STEP 10] MathSolverCache - Called store_node_cache() for {len(self.spatial_successors)} successors")
         else:
             # Fallback: text-only
             response = await self.llm.agen(messages)
         
         print(f"\n🎯 [STEP 11] MathSolverCache - Returning final response from node {self.id}")
         print(f"   🏷️  Node ID: {self.id} (this will appear as '{self.id}:' in other agents' prompts)")
-        print(f"   📝 Response preview: {response[:200]}..." if len(response) > 200 else f"   📝 Response: {response}")
+        print(f"   📝 Response by agen_with_cache preview: {response[:200]}..." if len(response) > 200 else f"   📝 Response: {response}")
         return response
     
     @property

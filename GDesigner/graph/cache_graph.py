@@ -111,7 +111,7 @@ class CacheGraph(Graph):
     def store_node_cache(self, node_id: str, cache: Any):
         """Store KV-cache for a node after execution"""
         if self.use_cache_communication:
-            print(f"\n💾 [STEP 11] CacheGraph.store_node_cache() - Storing cache for node {node_id}")
+            print(f"\n💾 [STEP 10] CacheGraph.store_node_cache() - Storing cache for node {node_id}")
             print(f"   Cache layers: {len(cache) if cache else 0}")
             if cache:
                 print(f"   Cache shape: {cache[0][0].shape if len(cache) > 0 else 'N/A'}")
@@ -181,7 +181,8 @@ class CacheGraph(Graph):
         # Pass graph reference to all nodes so they can access cache methods
         for node in self.nodes.values():
             node.graph = self
-        print(f"   ✅ Set graph reference on {len(self.nodes)} nodes")
+        node_ids = ', '.join(self.nodes.keys())
+        print(f"   ✅ Set graph reference on {len(self.nodes)} nodes: [{node_ids}]")
         
         # Call parent's arun
         print(f"   ➡️  Calling parent Graph.arun()...")
