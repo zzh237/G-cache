@@ -79,6 +79,7 @@ class CacheFuser(nn.Module):
         # All caches have same length - safe to fuse
         # Use actual number of layers from cache, not self.num_layers
         actual_num_layers = len(sharer_caches[0])
+        print(f"   📊 Detected {actual_num_layers} layers in cache (fuser has {self.num_layers} params)")
         fused_layers = []
         for l in range(actual_num_layers):
             # Weighted average of caches at layer l
