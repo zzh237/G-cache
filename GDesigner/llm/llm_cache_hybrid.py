@@ -149,8 +149,8 @@ class HybridCacheLLM:
                 input_ids,
                 messages,
                 attention_mask=attention_mask,
-                past_key_values=cache_kv,
-                max_tokens=kwargs.get("max_tokens", 1024)
+                past_key_values=cache_kv,  # Input cache (3703 tokens) - no limit
+                max_tokens=kwargs.get("max_tokens", 256)  # Output limit (new tokens to generate)
             )
         elif generation_mode == "local":
             # LOCAL: Local model only (real cache usage)
