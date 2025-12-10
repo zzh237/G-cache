@@ -201,7 +201,7 @@ class HybridCacheModel:
         cache_position = None
         if past_key_values is not None:
             past_len = past_key_values[0][0].shape[-2]
-            print(f"   🔗 [LOCAL-MODEL of 9a] Using past key values cache tensors: {len(past_key_values)} layers, {past_len} tokens")
+            print(f"   🔗 [LOCAL-MODEL of 9a] Using key values cache tensors: {len(past_key_values)} layers, {past_len} tokens")
             # Create cache_position for new tokens
             cache_position = torch.arange(
                 past_len,
@@ -217,7 +217,7 @@ class HybridCacheModel:
             )
             attention_mask = torch.cat([past_mask, attention_mask], dim=-1)
         else:
-            print(f"   🆕 [LOCAL-MODEL of 9a] No cache - generating from scratch")
+            print(f"   🆕 [LOCAL-MODEL of 9a] No cache")
         
         # Generate with cache tensors (LatentMAS lines 244-253)
         print(f"   ⚙️ [LOCAL-MODEL of 9a] Calling model.generate() with cache tensors...")
@@ -246,6 +246,7 @@ class HybridCacheModel:
             generations.append(text)
         
         print(f"   ✅ [LOCAL-MODEL] Generated {len(generations[0])} characters using cache tensors")
+        print(f"   📝 [LOCAL-MODEL] Generated text preview: {generations[0][:150]}...")
         return generations, outputs.past_key_values
     
     async def generate_text_batch_api(
@@ -266,13 +267,12 @@ class HybridCacheModel:
             (text_list, None) - API doesn't return cache
         """
         print(f"\n   🔄 [STEP 9b] HybridCacheModel.generate_text_batch_api() - Converting cache to text context")
-        print(f"   🔍 [DEBUG] past_key_values type: {type(past_key_values)}")
         
         # Inject cache context if available
         if past_key_values:
             # Cache is a TUPLE of (key, value) pairs, one per layer
             # Each key/value is a torch.Tensor with shape [batch, heads, seq_len, hidden_dim]
-            print(f"   🔍 [DEBUG] Cache structure:")
+            print(f"   🔍 [DEBUG] Cache structure: past_key_values type: {type(past_key_values)}")
             print(f"      - Type: tuple of {len(past_key_values)} layers")
             print(f"      - Layer 0 type: {type(past_key_values[0])}")
             print(f"      - Layer 0 key shape: {past_key_values[0][0].shape}")
@@ -294,7 +294,7 @@ class HybridCacheModel:
                 print(f"      Original: {original_content[:100]}...")
                 print(f"      Modified: {messages[-1]['content'][:150]}...")
         else:
-            print(f"   ⚠️ [API-CACHE] No cache available - API will generate from scratch")
+            print(f"   ⚠️ [API-CACHE] No cache used - API will be the solo source past_key_values type: {type(past_key_values)}")
         
         # Generate with API
         print(f"   🌐 [API] Calling {self.api_model_name} API (NOT using cache directly, only text context)...")
@@ -330,7 +330,7 @@ class HybridCacheModel:
         print(f"\n   ⭐ [HYBRID] Using TRUE hybrid approach...")
         
         # Step 1: Generate with local model using REAL cache
-        print(f"   📍 [HYBRID] Local model with real cache tensors, past_key_values, call generate_text_batch")
+        print(f"   📍 [HYBRID] Local model with real cache tensors, past_key_values, call generate_text_batch()")
         local_text, new_cache = self.generate_text_batch(
             input_ids,
             attention_mask=attention_mask,
