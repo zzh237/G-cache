@@ -118,9 +118,12 @@ class MathSolverCache(Node):
         past_kv = None
         has_cache = False
         if graph and hasattr(graph, 'get_fused_cache') and self.cache_mode != "text_only":
+            print(f"\n🎯 [STEP 4] call graph.get_fused_cache()")
             past_kv = graph.get_fused_cache(self)  # Fused from spatial predecessors
             has_cache = past_kv is not None
             print(f"\n📥 [STEP 5] MathSolverCache - Received fused cache: {has_cache}")
+            if has_cache:
+                print(f"   📊 Cache shape: {len(past_kv)} layers, first layer shape: {past_kv[0][0].shape if past_kv else 'N/A'}")
         
         # Step 2: Process inputs (build prompt from task + spatial/temporal context)
         print(f"\n📝 [STEP 5a] MathSolverCache._process_inputs() - Building prompt with context")

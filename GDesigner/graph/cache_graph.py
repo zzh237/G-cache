@@ -157,6 +157,16 @@ class CacheGraph(Graph):
         # Fuse caches using learnable fusion
         print(f"   🧪 Fusing {len(sharer_caches)} caches with weights {edge_weights}")
         fused = self.cache_fuser(sharer_caches, edge_weights)
+        
+        if fused is None:
+            print(f"   ❌ [ERROR] Cache fusion returned None! Checking why...")
+            print(f"      - sharer_caches type: {type(sharer_caches[0]) if sharer_caches else 'empty'}")
+            print(f"      - num_layers in fuser: {self.cache_fuser.num_layers}")
+            if sharer_caches and isinstance(sharer_caches[0], tuple):
+                print(f"      - actual cache layers: {len(sharer_caches[0])}")
+        else:
+            print(f"   ✅ Fusion successful: {len(fused)} layers")
+        
         return fused
     
     async def arun(self, input: Dict[str, str], num_rounds: int = 3, 

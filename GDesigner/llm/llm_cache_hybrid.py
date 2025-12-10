@@ -172,6 +172,9 @@ class HybridCacheLLM:
                 max_tokens=kwargs.get("max_tokens", 256)
             )
         
-        print(f"   📝 [RESULT] Generated {len(text[0])} characters of text")
+        print(f"\n✅ [STEP 9 COMPLETE] Text generation finished using cache!")
+        print(f"   📝 Final text: {len(text[0])} characters")
+        print(f"   💾 Cache: {len(cache_kv)} layers, seq_len={cache_kv[0][0].shape[2]} tokens")
+        print(f"   👁️  Text preview: {text[0][:150]}...")
         
         return text[0], cache_kv

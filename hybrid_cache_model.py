@@ -307,6 +307,7 @@ class HybridCacheModel:
         
         text = response.choices[0].message.content
         print(f"   ✅ [API] Received response: {len(text)} characters")
+        print(f"   📝 [API] Response preview: {text[:150]}...")
         return [text], None
     
     async def generate_text_batch_hybrid(
