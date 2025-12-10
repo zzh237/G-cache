@@ -83,6 +83,7 @@ class HybridCacheLLM:
         print(f"   💬 [STEP 7a] Converting messages to text prompt...")
         prompt = self._messages_to_text(messages)
         print(f"   ✅ Prompt length: {len(prompt)} characters")
+        print(f"   📄 FULL PROMPT:\n{prompt}")
         
         print(f"   🔤 [STEP 7b] Tokenizing prompt...")
         # Get model's max length (default to 2048 if not available)
@@ -137,12 +138,14 @@ class HybridCacheLLM:
         msg0_role = messages[0]['role']
         msg0_preview = messages[0]['content'][:80]
         print(f"      - messages[0] role: {msg0_role}, content preview: {msg0_preview}...")
+        print(f"      - messages[0] FULL CONTENT:\n{messages[0]['content']}")
         if len(messages) > 1:
             msg1_role = messages[1]['role']
             msg1_preview = messages[1]['content'][:80]
             msg1_full_len = len(messages[1]['content'])
             print(f"      - messages[1] role: {msg1_role}, content preview: {msg1_preview}...")
             print(f"      - messages[1] full length: {msg1_full_len} chars (may contain few-shot examples + actual question)")
+            print(f"      - messages[1] FULL CONTENT:\n{messages[1]['content']}")
         
         if generation_mode == "hybrid":
             # HYBRID: Local model + API refinement
@@ -178,5 +181,6 @@ class HybridCacheLLM:
         print(f"   📝 Final text: {len(text[0])} characters")
         print(f"   💾 Cache: {len(cache_kv)} layers, seq_len={cache_kv[0][0].shape[2]} tokens")
         print(f"   👁️  Text preview: {text[0][:150]}...")
+        print(f"   📄 FULL TEXT OUTPUT:\n{text[0]}")
         
         return text[0], cache_kv
