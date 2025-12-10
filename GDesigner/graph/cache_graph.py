@@ -30,6 +30,16 @@ class CacheFuser(nn.Module):
         if isinstance(first_cache, dict):
             return self._fuse_text_caches(sharer_caches, edge_weights)
         
+        # DynamicCache (HuggingFace cache object) - convert to tuple
+        elif hasattr(first_cache, 'key_cache') and hasattr(first_cache, 'value_cache'):
+            print(f"   🔄 Converting DynamicCache to tuple format...")
+            converted_caches = []
+            for cache in sharer_caches:
+                # DynamicCache has .key_cache and .value_cache as lists of tensors
+                tuple_cache = tuple((k, v) for k, v in zip(cache.key_cache, cache.value_cache))
+                converted_caches.append(tuple_cache)
+            return self._fuse_tensor_caches(converted_caches, edge_weights, tau)
+        
         # Tensor-based cache (local model mode)
         elif isinstance(first_cache, tuple):
             return self._fuse_tensor_caches(sharer_caches, edge_weights, tau)
@@ -67,10 +77,10 @@ class CacheFuser(nn.Module):
             return sharer_caches[0]
         
         # All caches have same length - safe to fuse
+        # Use actual number of layers from cache, not self.num_layers
+        actual_num_layers = len(sharer_caches[0])
         fused_layers = []
-        for l in range(self.num_layers):
-            gate = torch.sigmoid(self.layer_gates[l] / tau)
-            
+        for l in range(actual_num_layers):
             # Weighted average of caches at layer l
             fused_k, fused_v = None, None
             for w, cache in zip(edge_weights, sharer_caches):
@@ -85,10 +95,12 @@ class CacheFuser(nn.Module):
                     fused_k = fused_k + w * k
                     fused_v = fused_v + w * v
             
-            # Apply learnable gate
+            # Apply learnable gate (only if layer exists in fuser params)
             if fused_k is not None:
-                fused_k = gate * self.fusion_weights[l] * fused_k
-                fused_v = gate * self.fusion_weights[l] * fused_v
+                if l < self.num_layers:
+                    gate = torch.sigmoid(self.layer_gates[l] / tau)
+                    fused_k = gate * self.fusion_weights[l] * fused_k
+                    fused_v = gate * self.fusion_weights[l] * fused_v
                 fused_layers.append((fused_k, fused_v))
         
         return tuple(fused_layers) if fused_layers else None
