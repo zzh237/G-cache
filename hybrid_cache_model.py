@@ -119,9 +119,21 @@ class HybridCacheModel:
         else:
             attention_mask = attention_mask.to(self.device)
         
+        # Convert tuple cache to DynamicCache if needed
+        if past_key_values is not None and isinstance(past_key_values, tuple):
+            from transformers import DynamicCache
+            print(f"   🔄 Converting tuple cache to DynamicCache for model compatibility...")
+            dynamic_cache = DynamicCache()
+            for layer_idx, (key, value) in enumerate(past_key_values):
+                dynamic_cache.update(key, value, layer_idx)
+            past_key_values = dynamic_cache
+        
         # Handle past_key_values attention mask (LatentMAS lines 320-329)
         if past_key_values is not None:
-            past_len = past_key_values[0][0].shape[-2] if past_key_values else 0
+            if hasattr(past_key_values, 'get_seq_length'):
+                past_len = past_key_values.get_seq_length()
+            else:
+                past_len = past_key_values[0][0].shape[-2] if past_key_values else 0
             if past_len > 0:
                 past_mask = torch.ones(
                     (attention_mask.shape[0], past_len),
