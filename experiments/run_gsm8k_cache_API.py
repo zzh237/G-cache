@@ -159,13 +159,14 @@ async def main():
         answer_log_probs = []
         answers = []
         
-        for record in current_batch:
+        print(f"\n📦 [STEP 0] Loading batch tasks and preparing for execution...")
+        for idx, record in enumerate(current_batch):
             task = record["task"]
             answer = record["answer"]
             answers.append(answer)
             input_dict = {"task": task}
-            print(f"\n📝 Task: {task[:100]}...")  # Debug: show task
-            print(f"🎯 Expected answer: {answer}")
+            print(f"\n📝 [STEP 0.{idx+1}] Task {idx+1}/{len(current_batch)}: {task[:100]}...")  # ← THIS PRINTS YOUR TASK
+            print(f"🎯 Expected answer: {answer}")  # ← THIS PRINTS EXPECTED ANSWER
             # Reuse same graph for all tasks (models can't be deepcopied)
             answer_log_probs.append(asyncio.create_task(graph.arun(input_dict, args.num_rounds)))
         

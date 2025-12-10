@@ -98,10 +98,15 @@ class FinalRefer(Node):
     async def _async_execute(self, input:Dict[str,str],  spatial_info:Dict[str,Any], temporal_info:Dict[str,Any],**kwargs):
         """ To be overriden by the descendant class """
         """ Use the processed input to get the result """
-  
+        
+        print(f"\n🏆 [STEP 11.5] FinalRefer (Decision Agent) - Aggregating {len(spatial_info)} agent outputs")
         system_prompt, user_prompt = self._process_inputs(input, spatial_info, temporal_info)
         message = [{'role':'system','content':system_prompt},{'role':'user','content':user_prompt}]
+        
+        print(f"\n🧠 [STEP 11.6] FinalRefer - Calling LLM to make final decision...")
         response = await self.llm.agen(message)
+        
+        print(f"\n📝 [STEP 11.7] FinalRefer - Decision complete, printing details:")
         print(f"################system prompt:{system_prompt}")
         print(f"################user prompt:{user_prompt}")
         print(f"################response:{response}")
