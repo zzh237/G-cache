@@ -25,6 +25,11 @@ class CacheFuser(nn.Module):
         
         # Check cache type: tensor (local model) or dict (API)
         first_cache = sharer_caches[0]
+        print(f"   🔍 Cache type debug: {type(first_cache)}")
+        print(f"   🔍 Has key_cache: {hasattr(first_cache, 'key_cache')}")
+        print(f"   🔍 Has value_cache: {hasattr(first_cache, 'value_cache')}")
+        print(f"   🔍 Is tuple: {isinstance(first_cache, tuple)}")
+        print(f"   🔍 Is dict: {isinstance(first_cache, dict)}")
         
         # Text-based cache (API mode)
         if isinstance(first_cache, dict):
@@ -44,6 +49,7 @@ class CacheFuser(nn.Module):
         elif isinstance(first_cache, tuple):
             return self._fuse_tensor_caches(sharer_caches, edge_weights, tau)
         
+        print(f"   ❌ Unknown cache type, returning None")
         return None
     
     def _fuse_text_caches(self, sharer_caches: List[Dict], edge_weights: List[float]) -> Dict:
