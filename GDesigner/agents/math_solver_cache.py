@@ -137,7 +137,7 @@ class MathSolverCache(Node):
         
         # Step 3: Generate with LatentMAS cache (goal: create reasoning cache + generate response)
         if hasattr(self.llm, 'agen_with_cache') and self.cache_mode != "text_only":
-            print(f"\n🧠 [STEP 6] MathSolverCache - Calling llm.agen_with_cache() (Goal: Generate reasoning cache + text response)")
+            print(f"\n🧠 [STEP 6] MathSolverCache - Calling llm.agen_with_cache() in llm_cache_hybrid.py (Goal: Generate reasoning cache + text response)")
             # Uses: generate_latent_batch + generate_text_batch
             response, kv_cache = await self.llm.agen_with_cache(
                 messages, 
