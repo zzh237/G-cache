@@ -17,6 +17,31 @@ def load_gpqa_diamond(split: str = "test", cache_dir: Optional[str] = None) -> I
         }
 
 
+def load_medqa(json_path: str) -> Iterable[Dict]:
+    """Load MedQA from local JSON file"""
+    import json
+    with open(json_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    
+    choice_map = {"0": "A", "1": "B", "2": "C", "3": "D"}
+    
+    for item in data:
+        question = item["query"]
+        raw_answer = str(item["answer"])
+        
+        for idx, op in enumerate(item['options']):
+            if raw_answer in op:
+                answer = choice_map[str(idx)].lower()
+                break
+        
+        gold = normalize_answer(answer)
+        yield {
+            "question": question,
+            "solution": answer,
+            "gold": gold,
+        }
+
+
 def load_gsm8k(split: str = "test", cache_dir: Optional[str] = None) -> Iterable[Dict]:
     ds = load_dataset("gsm8k", "main", split=split, cache_dir=cache_dir)
     for item in ds:
