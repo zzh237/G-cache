@@ -29,7 +29,7 @@ from run_gsm8k import load_result, dataloader, get_kwargs
 
 # Import from local gcache_data folder
 from gcache_data.data import load_gpqa_diamond
-from gcache_data.utils import normalize_answer, extract_gsm8k_answer
+from gcache_data.utils import normalize_answer, extract_gpqa_answer
 
 
 def load_gpqa(split: str = "test") -> List[dict]:
@@ -42,12 +42,6 @@ def load_gpqa(split: str = "test") -> List[dict]:
             'answer': item['gold'],
         })
     return processed
-
-
-def extract_gpqa_answer(response: str) -> str:
-    """Extract answer from response (normalize for comparison)"""
-    extracted = extract_gsm8k_answer(response)
-    return normalize_answer(extracted) if extracted else None
 
 
 def parse_args():
@@ -214,8 +208,10 @@ async def main():
         print(f"\n📊 [STEP 14] Processing results and computing metrics...")
         for idx, (task, answer, log_prob, true_answer) in enumerate(zip(current_batch, raw_answers, log_probs, answers)):
             print(f"\n🔍 [DEBUG] Extracting answer from response...")
-            predict_answer = extract_gpqa_answer(answer[0])
+            extracted = extract_gpqa_answer(answer[0])
+            predict_answer = normalize_answer(extracted) if extracted else None
             print(f"   Extracted: '{predict_answer}', Expected: '{true_answer}'")
+            print(f"   Raw response snippet: {answer[0][-200:]}")
             # Exact match - both already normalized
             is_solved = (predict_answer == true_answer) if predict_answer and true_answer else False
             total_solved += is_solved
