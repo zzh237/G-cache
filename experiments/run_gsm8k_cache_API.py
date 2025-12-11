@@ -189,7 +189,8 @@ async def main():
         
         print(f"\n🏁 [STEP 13] Graph execution complete - received {len(raw_answers)} responses")
         for idx, (ans, prob) in enumerate(zip(raw_answers, log_probs)):
-            print(f"   📝 Task {idx+1} response preview: {str(ans[0])[:150]}...")
+            # print(f"   📝 Task {idx+1} response preview: {str(ans[0])[:150]}...")
+            print(f"   📝 Task {idx+1} response preview: {str(ans[0])}...")
         
         # Compute metrics
         loss_list = []

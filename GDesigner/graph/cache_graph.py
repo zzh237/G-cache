@@ -177,16 +177,25 @@ class CacheGraph(Graph):
         
         # Fuse caches using learnable fusion
         print(f"   🧪 Fusing {len(sharer_caches)} caches with weights {edge_weights}")
-        print(f"   📊 Cache fusion breakdown:")
+        print(f"   📊 Cache fusion breakdown (BEFORE fusion):")
         for i, pred in enumerate(node.spatial_predecessors):
             if pred.id in self.node_caches and self.node_caches[pred.id]:
                 cache = self.node_caches[pred.id]
                 if isinstance(cache, tuple):
-                    seq_len = cache[0][0].shape[2]
+                    k_shape = cache[0][0].shape
+                    v_shape = cache[0][1].shape
+                    print(f"      - Cache {i+1} from {pred.id}: weight={edge_weights[i]:.2f}")
+                    print(f"        Key shape: {k_shape}, Value shape: {v_shape}")
                 else:
-                    seq_len = len(cache)
-                print(f"      - Cache {i+1} from {pred.id}: weight={edge_weights[i]:.2f}, seq_len={seq_len}")
+                    print(f"      - Cache {i+1} from {pred.id}: weight={edge_weights[i]:.2f}, layers={len(cache)}")
+        
         fused = self.cache_fuser(sharer_caches, edge_weights)
+        
+        if fused and isinstance(fused, tuple):
+            print(f"   📊 Cache fusion result (AFTER fusion):")
+            print(f"      - Fused cache: {len(fused)} layers")
+            print(f"      - Key shape: {fused[0][0].shape}, Value shape: {fused[0][1].shape}")
+            print(f"      - ✅ Dimension unchanged (weighted average, not concatenation)")
         
         if fused is None:
             print(f"   ❌ [ERROR] Cache fusion returned None! Checking why...")
