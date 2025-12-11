@@ -124,7 +124,7 @@ async def main():
         node_kwargs = []
         for i, _ in enumerate(agent_names):
             is_final = (i == len(agent_names) - 1)  # Last agent before FinalRefer
-            max_tokens = 2048 if is_final else 512  # Final: 2048, Intermediate: 512
+            max_tokens = 2048 if is_final else 1024  # Final: 2048, Intermediate: 512
             node_kwargs.append({
                 "generation_mode": args.generation_mode,
                 "max_new_tokens": max_tokens
