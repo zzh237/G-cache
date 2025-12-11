@@ -57,6 +57,7 @@ def parse_args():
                         help='Generation mode: api_hint (API with text hint), hybrid (local+API), local (local only)')
     parser.add_argument('--hidden_dim', type=int, default=4096)
     parser.add_argument('--num_cache_layers', type=int, default=32)
+    parser.add_argument('--question_id', type=int, default=None, help='Run specific question by index (0-based)')
     
     args = parser.parse_args()
     return args
@@ -137,7 +138,17 @@ async def main():
         params += list(graph.cache_fuser.parameters())
     optimizer = torch.optim.Adam(params, lr=args.lr)
     
-    num_batches = min(int(len(dataset) / args.batch_size), args.num_iterations)
+    # Handle single question mode
+    if args.question_id is not None:
+        print(f"\n🎯 Running single question mode: Question ID {args.question_id}")
+        if args.question_id >= len(dataset):
+            print(f"❌ Error: Question ID {args.question_id} out of range (dataset has {len(dataset)} questions)")
+            return
+        dataset = [dataset[args.question_id]]
+        num_batches = 1
+    else:
+        num_batches = min(int(len(dataset) / args.batch_size), args.num_iterations)
+    
     total_solved, total_executed = 0, 0
     
     for i_batch in range(num_batches):
@@ -165,8 +176,10 @@ async def main():
             answer = record["answer"]
             answers.append(answer)
             input_dict = {"task": task}
-            print(f"\n📝 [STEP 0.{idx+1}] Task {idx+1}/{len(current_batch)}: {task[:100]}...")  # ← THIS PRINTS YOUR TASK
-            print(f"🎯 Expected answer: {answer}")  # ← THIS PRINTS EXPECTED ANSWER
+            global_idx = i_batch * args.batch_size + idx
+            print(f"\n📝 [STEP 0.{idx+1}] Question ID: {global_idx}")
+            print(f"   Task {idx+1}/{len(current_batch)}: {task[:100]}...")
+            print(f"   🎯 Expected answer: {answer}")
             # Reuse same graph for all tasks (models can't be deepcopied)
             answer_log_probs.append(asyncio.create_task(graph.arun(input_dict, args.num_rounds)))
         
@@ -196,7 +209,11 @@ async def main():
             single_loss = -log_prob * utility
             loss_list.append(single_loss)
             
+            global_idx = i_batch * args.batch_size + idx
+            print(f"   🔢 Question ID {global_idx}: Predicted={predict_answer}, Expected={true_answer}, Solved={is_solved}")
+            
             data.append({
+                "Question_ID": global_idx,
                 "Question": task["task"],
                 "Answer": true_answer,
                 "Response": answer,
