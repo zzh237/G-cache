@@ -47,31 +47,29 @@ class MathSolverCache(Node):
         system_prompt = self.constraint
         user_prompt = self.prompt_set.get_answer_prompt(question=raw_inputs["task"], role=self.role)
         
-        # Hybrid mode: Use both text and cache
+        # Hybrid mode: Pure cache-only communication (TRUE innovation!)
         if self.cache_mode == "hybrid":
-            # Add text info from graph structure
-            spatial_str = ""
-            temporal_str = ""
-            print(f"   🔖 [STEP 5a.1] Formatting spatial context from {len(spatial_info)} agents...")
-            for id, info in spatial_info.items():
-                # This creates the "939j: Let's analyze..." format you see in output
-                formatted_output = f"Agent {id} as a {info['role']} his answer to this question is:\n\n{info['output']}\n\n"
-                spatial_str += formatted_output
-                print(f"      ✅ Added output from agent {id} ({len(info['output'])} chars)")
-            print(f"   🔖 [STEP 5a.2] Formatting temporal context from {len(temporal_info)} agents...")
-            for id, info in temporal_info.items():
-                formatted_output = f"Agent {id} as a {info['role']} his answer to this question was:\n\n{info['output']}\n\n"
-                temporal_str += formatted_output
-                print(f"      ✅ Added output from agent {id} ({len(info['output'])} chars)")
+            # COMMENTED OUT: Text string building (not used in pure cache mode)
+            # spatial_str = ""
+            # temporal_str = ""
+            # print(f"   🔖 [STEP 5a.1] Formatting spatial context from {len(spatial_info)} agents...")
+            # for id, info in spatial_info.items():
+            #     formatted_output = f"Agent {id} as a {info['role']} his answer to this question is:\n\n{info['output']}\n\n"
+            #     spatial_str += formatted_output
+            #     print(f"      ✅ Added output from agent {id} ({len(info['output'])} chars)")
+            # print(f"   🔖 [STEP 5a.2] Formatting temporal context from {len(temporal_info)} agents...")
+            # for id, info in temporal_info.items():
+            #     formatted_output = f"Agent {id} as a {info['role']} his answer to this question was:\n\n{info['output']}\n\n"
+            #     temporal_str += formatted_output
+            #     print(f"      ✅ Added output from agent {id} ({len(info['output'])} chars)")
+            # if spatial_str:
+            #     user_prompt += f"\n\nSpatial context (same round):\n{spatial_str}"
+            # if temporal_str:
+            #     user_prompt += f"\n\nTemporal context (previous rounds):\n{temporal_str}"
             
-            if spatial_str:
-                user_prompt += f"\n\nSpatial context (same round):\n{spatial_str}"
-            if temporal_str:
-                user_prompt += f"\n\nTemporal context (previous rounds):\n{temporal_str}"
-            
-            # Indicate cache availability
-            if has_cache:
-                user_prompt += "\n\n[Note: Latent representations from predecessor agents are also available in KV-cache]"
+            # Pure cache-only: No text hints needed - cache is passed as tensors!
+            print(f"   📊 [CACHE-ONLY MODE] Relying purely on KV-cache tensors from predecessors")
+            # No text appending - cache is passed directly to model as past_key_values
         
         # Latent-only mode: Minimal text, rely on cache
         elif self.cache_mode == "latent_only":
