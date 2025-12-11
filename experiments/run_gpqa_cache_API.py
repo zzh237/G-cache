@@ -211,7 +211,7 @@ async def main():
             extracted = extract_gpqa_answer(answer[0])
             predict_answer = normalize_answer(extracted) if extracted else None
             print(f"   Extracted: '{predict_answer}', Expected: '{true_answer}'")
-            print(f"   Raw response snippet: {answer[0][-200:]}")
+            print(f"   Raw response snippet: {answer[0]}")
             # Exact match - both already normalized
             is_solved = (predict_answer == true_answer) if predict_answer and true_answer else False
             total_solved += is_solved
