@@ -111,7 +111,7 @@ async def main():
     
     kwargs = get_kwargs(args.mode, len(agent_names))
     
-    # Set generation mode
+    # Set generation mode and max_new_tokens
     if args.use_cache:
         if args.generation_mode == 'hybrid':
             print(f"⭐ Generation mode: HYBRID (local model + API refinement)")
@@ -119,7 +119,17 @@ async def main():
             print(f"🖥️  Generation mode: LOCAL (local model only, real cache)")
         else:  # api_hint
             print(f"🌐 Generation mode: API_HINT (API with text hint)")
-        node_kwargs = [{"generation_mode": args.generation_mode} for _ in agent_names]
+        
+        # Different max_new_tokens for intermediate vs final agents
+        node_kwargs = []
+        for i, _ in enumerate(agent_names):
+            is_final = (i == len(agent_names) - 1)  # Last agent before FinalRefer
+            max_tokens = 2048 if is_final else 512  # Final: 2048, Intermediate: 512
+            node_kwargs.append({
+                "generation_mode": args.generation_mode,
+                "max_new_tokens": max_tokens
+            })
+        print(f"📏 Token limits: Intermediate agents=512, Final agent=2048")
     else:
         node_kwargs = [{} for _ in agent_names]
     
@@ -128,7 +138,7 @@ async def main():
     
     # Create CacheGraph
     graph = CacheGraph(
-        domain="gsm8k",  # Reuse gsm8k domain for prompts
+        domain="medqa",  # Use MedQA-specific prompts
         llm_name=args.llm_name,
         agent_names=agent_names,
         decision_method=args.decision_method,
