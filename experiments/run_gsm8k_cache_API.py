@@ -58,7 +58,6 @@ def parse_args():
     parser.add_argument('--hidden_dim', type=int, default=4096)
     parser.add_argument('--num_cache_layers', type=int, default=32)
     parser.add_argument('--question_id', type=int, default=None, help='Run specific question by index (0-based)')
-    parser.add_argument('--max_cache_tokens', type=int, default=2048, help='Max tokens to keep in cache (prevents overflow)')
     
     args = parser.parse_args()
     return args
@@ -127,7 +126,6 @@ async def main():
         use_cache_communication=args.use_cache,
         hidden_dim=args.hidden_dim,
         num_cache_layers=args.num_cache_layers,
-        max_cache_tokens=args.max_cache_tokens,
         node_kwargs=node_kwargs,
         **kwargs
     )
