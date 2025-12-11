@@ -57,7 +57,7 @@ class HybridCacheLLM:
         text, _ = await self.hybrid_model.generate_text_batch_api(
             messages,
             past_key_values=None,
-            max_tokens=kwargs.get("max_tokens", 256)
+            max_tokens=kwargs.get("max_tokens", 4096)
         )
         return text[0]
     
@@ -155,7 +155,7 @@ class HybridCacheLLM:
                 messages,
                 attention_mask=attention_mask,
                 past_key_values=cache_kv,  # Input cache (3703 tokens) - no limit
-                max_tokens=kwargs.get("max_tokens", 256)  # Output limit (new tokens to generate)
+                max_tokens=kwargs.get("max_tokens", 4096)  # Output limit (new tokens to generate)
             )
         elif generation_mode == "local":
             # LOCAL: Local model only (real cache usage)

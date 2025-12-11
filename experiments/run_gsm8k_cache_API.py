@@ -199,7 +199,9 @@ async def main():
         
         print(f"\n📊 [STEP 14] Processing results and computing metrics...")
         for task, answer, log_prob, true_answer in zip(current_batch, raw_answers, log_probs, answers):
+            print(f"\n🔍 [DEBUG] Extracting answer from response...")
             predict_answer = gsm_get_predict(answer[0])
+            print(f"   Extracted: '{predict_answer}', Expected: '{true_answer}'")
             is_solved = float(predict_answer) == float(true_answer)
             total_solved += is_solved
             total_executed += 1

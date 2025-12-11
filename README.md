@@ -735,3 +735,9 @@ This ensures the tensor maintains gradient tracking and is properly registered a
 1. **Gradient Flow:** The GCN → MLP → spatial_logits → log_probs chain now properly maintains gradients
 2. **Cache Training:** When `--use_cache` is enabled, both GCN and CacheFuser parameters are optimized
 3. **Edge Weights:** The `get_edge_weight` method provides default weights (can be extended for learned edge weights)
+
+
+The API call flow 
+FinalRefer → HybridCacheLLM.agen() → hybrid_model.generate_text_batch_api() 
+→ AsyncOpenAI.chat.completions.create(model="qwen-flash", max_tokens=4096)
+→ Your .env BASE_URL + API_KEY

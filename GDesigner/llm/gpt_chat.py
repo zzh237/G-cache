@@ -22,7 +22,8 @@ MINE_API_KEYS = os.getenv('API_KEY')
 @retry(wait=wait_random_exponential(max=100), stop=stop_after_attempt(3))
 async def achat(
     model: str,
-    msg: List[Dict],):
+    msg: List[Dict],
+    max_tokens: int = 4096):
     request_url = f"{MINE_BASE_URL}/chat/completions"
     headers = {
         'Content-Type': 'application/json',
@@ -32,6 +33,7 @@ async def achat(
         "model": model,
         "messages": msg,
         "stream": False,
+        "max_tokens": max_tokens,
     }
     async with aiohttp.ClientSession() as session:
         async with session.post(request_url, headers=headers, json=data) as response:
@@ -71,7 +73,7 @@ class GPTChat(LLM):
         else:
             msg_dicts = messages
             
-        return await achat(self.model_name, msg_dicts)
+        return await achat(self.model_name, msg_dicts, max_tokens)
     
     def gen(
         self,
