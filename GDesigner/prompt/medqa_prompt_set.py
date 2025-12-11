@@ -93,3 +93,31 @@ class MedQAPromptSet(PromptSet):
     @staticmethod
     def get_decision_few_shot():
         return ""
+    
+    @staticmethod
+    def get_adversarial_answer_prompt(question):
+        return f"\n\nQ:{question}"
+    
+    @staticmethod
+    def get_query_prompt(question):
+        return f"\n\nQ:{question}"
+    
+    @staticmethod
+    def get_file_analysis_prompt(query, file):
+        return f"Query: {query}\n\nFile: {file}"
+    
+    @staticmethod
+    def get_websearch_prompt(question, query):
+        return f"Question: {question}\n\nQuery: {query}"
+    
+    @staticmethod
+    def get_distill_websearch_prompt(question, query, results):
+        return f"Question: {question}\n\nQuery: {query}\n\nResults: {results}"
+    
+    @staticmethod
+    def get_reflect_prompt(question, answer):
+        return f"Question: {question}\n\nAnswer: {answer}"
+    
+    @staticmethod
+    def get_combine_materials(materials: Dict[str, Any]) -> str:
+        return str(materials)
