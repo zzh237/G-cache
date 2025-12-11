@@ -52,7 +52,7 @@ def parse_args():
     parser.add_argument('--lr', type=float, default=0.1)
     parser.add_argument('--batch_size', type=int, default=1)
     parser.add_argument('--num_rounds', type=int, default=1)
-    parser.add_argument('--num_iterations', type=int, default=1)
+    parser.add_argument('--num_iterations', type=int, default=10)
     parser.add_argument('--domain', type=str, default="gpqa")
     parser.add_argument('--agent_nums', nargs='+', type=int, default=[4])
     parser.add_argument('--decision_method', type=str, default='FinalRefer')
@@ -122,12 +122,12 @@ async def main():
         node_kwargs = []
         for i, _ in enumerate(agent_names):
             is_final = (i == len(agent_names) - 1)  # Last agent before FinalRefer
-            max_tokens = 2048 if is_final else 512  # Final: 2048, Intermediate: 512
+            max_tokens = 2048 if is_final else 1024  # Final: 2048, Intermediate: 1024 (GPQA needs more reasoning)
             node_kwargs.append({
                 "generation_mode": args.generation_mode,
                 "max_new_tokens": max_tokens
             })
-        print(f"📏 Token limits: Intermediate agents=512, Final agent=2048")
+        print(f"📏 Token limits: Intermediate agents=1024, Final agent=2048")
     else:
         node_kwargs = [{} for _ in agent_names]
     
