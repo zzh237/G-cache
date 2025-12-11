@@ -44,7 +44,7 @@ def parse_args():
     parser.add_argument('--lr', type=float, default=0.1)
     parser.add_argument('--batch_size', type=int, default=1)  # Set to 1 for single data test
     parser.add_argument('--num_rounds', type=int, default=1)
-    parser.add_argument('--num_iterations', type=int, default=1)  # Set to 1 for single batch test
+    parser.add_argument('--num_iterations', type=int, default=10)  # Set to 1 for single batch test
     parser.add_argument('--domain', type=str, default="gsm8k")
     parser.add_argument('--agent_nums', nargs='+', type=int, default=[4])
     parser.add_argument('--decision_method', type=str, default='FinalRefer')
