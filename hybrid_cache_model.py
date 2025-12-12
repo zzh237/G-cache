@@ -233,6 +233,23 @@ class HybridCacheModel:
         
         # Generate with cache tensors (LatentMAS lines 244-253)
         print(f"   ⚙️ [LOCAL-MODEL of 9a] Calling model.generate() with cache tensors...")
+        print(f"\n   📐 [DIMENSIONS] Input dimensions for model.generate():")
+        print(f"      • input_ids: {input_ids.shape} (batch_size={input_ids.shape[0]}, seq_len={input_ids.shape[1]})")
+        print(f"      • attention_mask: {attention_mask.shape}")
+        if past_key_values is not None:
+            print(f"      • past_key_values: {len(past_key_values)} layers")
+            print(f"        - Layer 0 Key: {past_key_values[0][0].shape} [batch, heads, seq_len, head_dim]")
+            print(f"        - Layer 0 Value: {past_key_values[0][1].shape} [batch, heads, seq_len, head_dim]")
+            print(f"        - Cached sequence length: {past_key_values[0][0].shape[2]} tokens")
+        else:
+            print(f"      • past_key_values: None")
+        if cache_position is not None:
+            print(f"      • cache_position: {cache_position.shape} = {cache_position.tolist()}")
+        else:
+            print(f"      • cache_position: None")
+        print(f"      • max_new_tokens: {max_new_tokens}")
+        print(f"      • temperature: {temperature}, top_p: {top_p}")
+        
         outputs = self.cache_model.generate(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -246,7 +263,13 @@ class HybridCacheModel:
             past_key_values=past_key_values,
             cache_position=cache_position,  # ← FIX: Tell model where new tokens go!
         )
-        print(f"   ⚙️ [LOCAL-MODEL of 9a] {outputs.past_key_values[0][0].shape[2]} tokens generated")
+        print(f"\n   📐 [DIMENSIONS] Output dimensions from model.generate():")
+        print(f"      • sequences: {outputs.sequences.shape} (batch_size={outputs.sequences.shape[0]}, total_seq_len={outputs.sequences.shape[1]})")
+        if outputs.past_key_values is not None:
+            print(f"      • past_key_values: {len(outputs.past_key_values)} layers")
+            print(f"        - Layer 0 Key: {outputs.past_key_values[0][0].shape}")
+            print(f"        - Layer 0 Value: {outputs.past_key_values[0][1].shape}")
+            print(f"        - Final sequence length: {outputs.past_key_values[0][0].shape[2]} tokens")
         print(f"   ✅ [LOCAL-MODEL of 9a] model.generate() complete")
         
         # Decode generated text (LatentMAS lines 254-260)

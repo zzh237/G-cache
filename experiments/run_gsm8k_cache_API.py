@@ -207,6 +207,10 @@ async def main():
         utilities = []
         data = load_result(result_file)
         
+        print(f"\n📊 [STEP 13.5] Log probabilities info:")
+        print(f"   📏 Number of log_probs: {len(log_probs)} (should equal batch_size={args.batch_size})")
+        print(f"   📏 Number of tasks in this batch: {len(current_batch)}")
+        
         print(f"\n📊 [STEP 14] Processing results and computing metrics...")
         for task, answer, log_prob, true_answer in zip(current_batch, raw_answers, log_probs, answers):
             print(f"\n🔍 [DEBUG] Extracting answer from response...")
@@ -242,6 +246,10 @@ async def main():
         
         # Backprop
         if loss_list:
+            print(f"\n🔄 [STEP 15] Backpropagation:")
+            print(f"   📏 loss_list dimensions: {len(loss_list)} losses (one per task in batch)")
+            print(f"   📊 Batch contains {len(current_batch)} tasks/questions")
+            
             total_loss = torch.mean(torch.stack(loss_list))
             if args.use_cache and total_loss.requires_grad:
                 try:
@@ -250,16 +258,21 @@ async def main():
                     # Clip gradients to prevent NaN/Inf
                     torch.nn.utils.clip_grad_norm_(params, max_norm=1.0)
                     optimizer.step()
+                    print(f"   ✅ Optimizer step completed for batch/update {i_batch}")
                 except RuntimeError as e:
-                    print(f"⚠️ Backprop error: {e}")
-                    print(f"Skipping optimization step")
+                    print(f"   ⚠️ Backprop error: {e}")
+                    print(f"   ⚠️ Skipping optimization step for batch/update {i_batch}")
+            else:
+                print(f"   ⏭️ Skipping backprop (use_cache={args.use_cache}, requires_grad={total_loss.requires_grad})")
         else:
             total_loss = torch.tensor(0.0)
+            print(f"\n⚠️ [STEP 15] No losses to backpropagate")
         
-        print(f"⏱️  Batch time: {time.time() - start_ts:.3f}s")
-        print(f"📊 Accuracy: {accuracy:.4f}")
-        print(f"📉 Loss: {total_loss.item():.4f}")
-        print(f"✅ Solved: {total_solved}/{total_executed}")
+        print(f"\n📊 [BATCH/UPDATE {i_batch}] Summary:")
+        print(f"   ⏱️  Batch time: {time.time() - start_ts:.3f}s")
+        print(f"   📊 Cumulative Accuracy: {accuracy:.4f} ({total_solved}/{total_executed})")
+        print(f"   📉 Batch Loss: {total_loss.item():.4f}")
+        print(f"   ✅ Batch Solved: {sum(utilities)}/{len(utilities)}")
     
     print(f"\n{'='*80}")
     print(f"✅ FINAL RESULTS")

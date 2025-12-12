@@ -741,3 +741,39 @@ The API call flow
 FinalRefer → HybridCacheLLM.agen() → hybrid_model.generate_text_batch_api() 
 → AsyncOpenAI.chat.completions.create(model="qwen-flash", max_tokens=4096)
 → Your .env BASE_URL + API_KEY
+
+
+Step-by-Step Call Chain:
+1. run_gpqa_cache_API.py (line ~200)
+   answer_log_probs.append(asyncio.create_task(graph.arun(input_dict, args.num_rounds)))
+   ↓
+
+2. graph.arun() (graph.py line 374)
+   - Constructs graph connections
+   - Executes nodes in topological order
+   - Line 402: await self.nodes[current_node_id].async_execute(input)
+   ↓
+
+3. node.async_execute() (node.py line 157)
+   - Gets spatial_info and temporal_info
+   - Line 162: self._async_execute(input, spatial_info, temporal_info)
+   ↓
+
+4. MathSolverCache._async_execute() (math_solver_cache.py line 101)
+   - Your STEP 3-11 logs
+   - Line 175: return response
+   ↓
+
+5. Back to node.async_execute() (node.py line 168)
+   - Stores result in self.outputs
+   - Returns self.outputs
+   ↓
+
+6. Back to graph.arun() (graph.py line 418-420)
+   - After all nodes execute, calls decision_node
+   - Returns: final_answers, log_probs
+   ↓
+
+7. Back to run_gpqa_cache_API.py (line ~210)
+   raw_results = await asyncio.gather(*answer_log_probs)
+   raw_answers, log_probs = zip(*raw_results)
