@@ -141,16 +141,16 @@ class MathSolverCache(Node):
         # Detailed breakdown
         print(f"   📊 Prompt composition breakdown:")
         print(f"      - Original question: {original_len} chars")
-        for agent_id, info in spatial_info.items():
-            print(f"      - From agent {agent_id}: +{len(info['output'])} chars")
-        for agent_id, info in temporal_info.items():
-            print(f"      - From agent {agent_id} (temporal): +{len(info['output'])} chars")
+        # for agent_id, info in spatial_info.items():
+        #     print(f"      - From agent {agent_id}: +{len(info['output'])} chars")
+        # for agent_id, info in temporal_info.items():
+        #     print(f"      - From agent {agent_id} (temporal): +{len(info['output'])} chars")
         print(f"      - Total user prompt: {len(user_prompt)} chars")
         print(f"   ✅ Built messages: system ({len(system_prompt)} chars) + user ({len(user_prompt)} chars)")
-        if spatial_info:
-            print(f"   💬 Spatial context includes outputs from: {', '.join(spatial_info.keys())}")
-        if temporal_info:
-            print(f"   💬 Temporal context includes outputs from: {', '.join(temporal_info.keys())}")
+        # if spatial_info:
+        #     print(f"   💬 Spatial context includes outputs from: {', '.join(spatial_info.keys())}")
+        # if temporal_info:
+        #     print(f"   💬 Temporal context includes outputs from: {', '.join(temporal_info.keys())}")
         
         # Step 3: Generate with LatentMAS cache (goal: create reasoning cache + generate response)
         if hasattr(self.llm, 'agen_with_cache') and self.cache_mode != "text_only":

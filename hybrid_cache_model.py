@@ -129,11 +129,16 @@ class HybridCacheModel:
             past_key_values = dynamic_cache
         
         # Handle past_key_values attention mask (LatentMAS lines 320-329)
+        print(f"\n   📐 [DIMENSIONS] BEFORE Step 1 - Initial forward pass:")
+        print(f"      • input_ids: {input_ids.shape}")
+        print(f"      • attention_mask (before concat): {attention_mask.shape}")
         if past_key_values is not None:
             if hasattr(past_key_values, 'get_seq_length'):
                 past_len = past_key_values.get_seq_length()
             else:
                 past_len = past_key_values[0][0].shape[-2] if past_key_values else 0
+            print(f"      • INPUT past_key_values: {len(past_key_values)} layers, seq_len={past_len}")
+            print(f"        - Layer 0 Key: {past_key_values[0][0].shape}")
             if past_len > 0:
                 past_mask = torch.ones(
                     (attention_mask.shape[0], past_len),
@@ -141,6 +146,9 @@ class HybridCacheModel:
                     device=attention_mask.device,
                 )
                 attention_mask = torch.cat([past_mask, attention_mask], dim=-1)
+                print(f"      • attention_mask (after concat): {attention_mask.shape} = {past_len} (past) + {input_ids.shape[1]} (new)")
+        else:
+            print(f"      • INPUT past_key_values: None")
         
         # Step 1: Initial forward pass (LatentMAS lines 331-338)
         outputs = self.cache_model(
@@ -154,8 +162,21 @@ class HybridCacheModel:
         past = outputs.past_key_values
         last_hidden = outputs.hidden_states[-1][:, -1, :]  # [B, D]
         
+        print(f"\n   📐 [DIMENSIONS] AFTER Step 1 - Initial forward pass:")
+        print(f"      • OUTPUT past_key_values: {len(past)} layers, seq_len={past[0][0].shape[2]}")
+        print(f"        - Layer 0 Key: {past[0][0].shape}")
+        print(f"        - Layer 0 Value: {past[0][1].shape}")
+        print(f"      • last_hidden: {last_hidden.shape} [batch, hidden_dim]")
+        if past_key_values is not None:
+            input_past_len = past_key_values[0][0].shape[2] if hasattr(past_key_values[0][0], 'shape') else past_key_values.get_seq_length()
+            output_past_len = past[0][0].shape[2]
+            print(f"      • Cache grew by: {output_past_len - input_past_len} tokens (added {input_ids.shape[1]} input tokens)")
+        
         # Step 2: Latent reasoning loop (LatentMAS lines 348-378)
+        print(f"\n   🔄 [STEP 2] Starting latent reasoning loop ({latent_steps} steps)...")
         for step in range(latent_steps):
+            past_len_before = past[0][0].shape[2]
+            
             # Apply alignment matrix (LatentMAS line 348)
             latent_vec = self._apply_alignment(last_hidden)
             latent_embed = latent_vec.unsqueeze(1)  # [B, 1, D]
@@ -179,8 +200,16 @@ class HybridCacheModel:
             )
             past = outputs.past_key_values
             last_hidden = outputs.hidden_states[-1][:, -1, :]
+            
+            past_len_after = past[0][0].shape[2]
+            if step == 0 or step == latent_steps - 1:
+                print(f"      • Latent step {step+1}/{latent_steps}: cache {past_len_before} → {past_len_after} (+{past_len_after - past_len_before} token)")
         
         final_seq_len = past[0][0].shape[2]
+        print(f"\n   📐 [DIMENSIONS] FINAL - After all latent steps:")
+        print(f"      • Final past_key_values: {len(past)} layers, seq_len={final_seq_len}")
+        print(f"        - Layer 0 Key: {past[0][0].shape}")
+        print(f"        - Layer 0 Value: {past[0][1].shape}")
         print(f"   ✅ [LOCAL-MODEL] Cache generation complete: {len(past)} layers, {final_seq_len} tokens")
         return past  # LatentMAS line 380
     
