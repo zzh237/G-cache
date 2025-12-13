@@ -94,9 +94,13 @@ class HybridCacheModel:
         if not self.use_alignment:
             return hidden
         
+        print(f"         • _apply_alignment: hidden: {hidden.shape}")
+        print(f"         • _apply_alignment: self._alignment_matrix: {self._alignment_matrix.shape}")
         aligned = torch.matmul(hidden.float(), self._alignment_matrix)
         norm = aligned.norm(dim=-1, keepdim=True).clamp_min(1e-6)
+        print(f"         • _apply_alignment: norm: {norm.shape}")
         aligned = aligned * (self._target_norm / norm)
+        print(f"         • _apply_alignment: aligned: {aligned.shape}")
         return aligned.to(hidden.dtype)
     
     @torch.no_grad()
@@ -164,7 +168,7 @@ class HybridCacheModel:
         last_hidden = outputs.hidden_states[-1][:, -1, :]  # [B, D]
         
         print(f"\n   📐 [STEP 8a][DIMENSIONS] AFTER Step 1 - Initial forward pass:")
-        print(f"      • OUTPUT past_key_values: {len(past)} layers, seq_len={past[0][0].shape[2]}")
+        print(f"      • OUTPUT past_key_values, lengh increased: {len(past)} layers, seq_len={past[0][0].shape[2]}")
         print(f"        - Layer 0 Key: {past[0][0].shape}")
         print(f"        - Layer 0 Value: {past[0][1].shape}")
         
