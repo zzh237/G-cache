@@ -176,25 +176,26 @@ class HybridCacheModel:
         # Step 2: Latent reasoning loop (LatentMAS lines 348-378)
         print(f"\n   🔄 [STEP 8a][STEP 2] Starting latent reasoning loop ({latent_steps} steps)...")
         for step in range(latent_steps):
+            print(f"      • OUTPUT past_key_values: {len(past)} layers, seq_len={past[0][0].shape[2]}")
+            print(f"        - Layer 0 Key: {past[0][0].shape}")
+            print(f"        - Layer 0 Value: {past[0][1].shape}")
             past_len_before = past[0][0].shape[2]
-            print(f"   Latent step{step}: seq_len={past_len_before}")
+            # print(f"   Latent step{step}: seq_len={past_len_before}")
             print(f"      • last_hidden: {last_hidden.shape} [batch, hidden_dim]")
             # Apply alignment matrix (LatentMAS line 348)
             latent_vec = self._apply_alignment(last_hidden)
+            print(f"      • latent_vec: {latent_vec.shape}")
             latent_embed = latent_vec.unsqueeze(1)  # [B, 1, D]
             
             # Calculate past length (LatentMAS lines 361-362)
             past_len = past[0][0].shape[-2] if past else 0
-            print(f"   Latent step{step}: seq_len={past_len}")
+            # print(f"   Latent step{step}: seq_len={past_len}")
             latent_mask = torch.ones(
                 (latent_embed.shape[0], past_len + 1),
                 dtype=torch.long,
                 device=self.device,
             )
-            print(f"      • OUTPUT past_key_values: {len(past)} layers, seq_len={past[0][0].shape[2]}")
-            print(f"        - Layer 0 Key: {past[0][0].shape}")
-            print(f"        - Layer 0 Value: {past[0][1].shape}")
-            
+
             # Forward pass with embedding (LatentMAS lines 363-370)
             outputs = self.cache_model(
                 inputs_embeds=latent_embed,
