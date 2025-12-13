@@ -207,11 +207,12 @@ class HybridCacheModel:
                 output_hidden_states=True,
                 return_dict=True,
             )
+            print(f"      •cashe_model: outputs.hidden_states: {len(outputs.hidden_states)} layers, last layer shape: {outputs.hidden_states[-1].shape}")
             past = outputs.past_key_values
             last_hidden = outputs.hidden_states[-1][:, -1, :]
             
             past_len_after = past[0][0].shape[2]
-            print(f"      • OUTPUT past_len_after: {len(past)} layers, seq_len={past_len_after}")
+            print(f"      ••cashe_model: OUTPUT past_len_after: {len(past)} layers, seq_len={past_len_after}")
             print(f"        - Layer 0 Key: {past[0][0].shape}")
             print(f"        - Layer 0 Value: {past[0][1].shape}")
             if step == 0 or step == latent_steps - 1:
