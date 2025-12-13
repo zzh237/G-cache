@@ -176,7 +176,7 @@ class HybridCacheModel:
         # Step 2: Latent reasoning loop (LatentMAS lines 348-378)
         print(f"\n   🔄 [STEP 8a][STEP 2] Starting latent reasoning loop ({latent_steps} steps)...")
         for step in range(latent_steps):
-            print(f"      • OUTPUT past_key_values: {len(past)} layers, seq_len={past[0][0].shape[2]}")
+            print(f"      •cashe_model: OUTPUT past_key_values: {len(past)} layers, seq_len={past[0][0].shape[2]}")
             print(f"        - Layer 0 Key: {past[0][0].shape}")
             print(f"        - Layer 0 Value: {past[0][1].shape}")
             past_len_before = past[0][0].shape[2]
@@ -186,6 +186,7 @@ class HybridCacheModel:
             latent_vec = self._apply_alignment(last_hidden)
             print(f"      • latent_vec: {latent_vec.shape}")
             latent_embed = latent_vec.unsqueeze(1)  # [B, 1, D]
+            print(f"      •cashe_model: latent_embed: {latent_embed.shape}")
             
             # Calculate past length (LatentMAS lines 361-362)
             past_len = past[0][0].shape[-2] if past else 0
@@ -195,6 +196,7 @@ class HybridCacheModel:
                 dtype=torch.long,
                 device=self.device,
             )
+            print(f"      •cashe_model: latent_mask: {latent_mask.shape}")
 
             # Forward pass with embedding (LatentMAS lines 363-370)
             outputs = self.cache_model(
