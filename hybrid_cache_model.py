@@ -230,6 +230,19 @@ class HybridCacheModel:
         print(f"   ✅ [LOCAL-MODEL] Cache generation complete: {len(past)} layers, {final_seq_len} tokens")
         return past  # LatentMAS line 380
     
+    def _sample_top_p(self, logits: torch.Tensor, top_p: float, temperature: float) -> torch.Tensor:
+        """Sample from top-p (nucleus) distribution"""
+        logits = logits / temperature
+        probs = torch.softmax(logits, dim=-1)
+        sorted_probs, sorted_indices = torch.sort(probs, descending=True, dim=-1)
+        cumsum_probs = torch.cumsum(sorted_probs, dim=-1)
+        mask = cumsum_probs - sorted_probs > top_p
+        sorted_probs[mask] = 0.0
+        sorted_probs = sorted_probs / sorted_probs.sum(dim=-1, keepdim=True)
+        next_token = torch.multinomial(sorted_probs, num_samples=1)
+        next_token = torch.gather(sorted_indices, -1, next_token)
+        return next_token
+    
     @torch.no_grad()
     def generate_text_batch(
         self,
@@ -242,94 +255,212 @@ class HybridCacheModel:
     ) -> Tuple[List[str], Optional[Tuple]]:
         """
         Generate text using LOCAL model with cache tensors DIRECTLY
-        EXACT implementation from LatentMAS models.py:216-265
+        Option B: Manual autoregressive decoding from cache end (no prompt duplication)
         
-        This is the REAL cache usage - tensors are passed directly to model.generate()
+        This avoids re-feeding the prompt by starting generation directly from
+        the last hidden state of the cache.
         """
-        print(f"\n   🎯 [STEP 9a] HybridCacheModel.generate_text_batch() - Generating text using cache TENSORS directly")
+        print(f"\n   🎯 [STEP 9a] HybridCacheModel.generate_text_batch() - Manual autoregressive decoding (Option B)")
         
         if input_ids.dim() != 2:
             raise ValueError("input_ids must be 2D with shape [batch, seq_len]")
         if attention_mask is None:
             attention_mask = torch.ones_like(input_ids, device=self.device)
         
+        batch_size = input_ids.shape[0]
         prompt_lengths = attention_mask.sum(dim=1).tolist()
         
-        # Handle past_key_values and cache_position
-        cache_position = None
+        # Get initial state from cache
         if past_key_values is not None:
             past_len = past_key_values[0][0].shape[-2]
-            print(f"   🔗 [LOCAL-MODEL of 9a] Using key values cache tensors: {len(past_key_values)} layers, {past_len} tokens")
-            # Create cache_position for new tokens
-            cache_position = torch.arange(
-                past_len,
-                past_len + input_ids.shape[-1],
-                dtype=torch.long,
-                device=self.device,
+            print(f"   🔗 [LOCAL-MODEL of 9a] Using cache: {len(past_key_values)} layers, {past_len} tokens")
+            print(f"   ⚠️  [OPTION B] Starting generation from cache end (NO prompt re-feeding)")
+            
+            # Get last hidden state by doing ONE forward pass with the prompt
+            # This is needed to get the hidden state at the cache boundary
+            print(f"   📍 [OPTION B] Getting initial hidden state from prompt...")
+            outputs = self.cache_model(
+                input_ids=input_ids,
+                attention_mask=torch.cat([
+                    torch.ones((batch_size, past_len), dtype=torch.long, device=self.device),
+                    attention_mask
+                ], dim=-1),
+                past_key_values=past_key_values,
+                use_cache=True,
+                output_hidden_states=True,
+                return_dict=True,
             )
-            # Create attention mask for past + current tokens
-            past_mask = torch.ones(
-                (attention_mask.shape[0], past_len),
-                dtype=attention_mask.dtype,
-                device=attention_mask.device,
+            past = outputs.past_key_values
+            last_hidden = outputs.hidden_states[-1][:, -1, :]  # [B, D]
+            current_len = past[0][0].shape[2]
+            print(f"   ✅ [OPTION B] Initial state ready: cache_len={current_len}, hidden={last_hidden.shape}")
+        else:
+            print(f"   🆕 [LOCAL-MODEL of 9a] No cache - starting from scratch")
+            outputs = self.cache_model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                use_cache=True,
+                output_hidden_states=True,
+                return_dict=True,
             )
-            attention_mask = torch.cat([past_mask, attention_mask], dim=-1)
-        else:
-            print(f"   🆕 [LOCAL-MODEL of 9a] No cache")
+            past = outputs.past_key_values
+            last_hidden = outputs.hidden_states[-1][:, -1, :]
+            current_len = past[0][0].shape[2]
         
-        # Generate with cache tensors (LatentMAS lines 244-253)
-        print(f"   ⚙️ [LOCAL-MODEL of 9a] Calling model.generate() with cache tensors...")
-        print(f"\n   📐 [DIMENSIONS] Input dimensions for model.generate():")
-        print(f"      • input_ids: {input_ids.shape} (batch_size={input_ids.shape[0]}, seq_len={input_ids.shape[1]})")
-        print(f"      • attention_mask: {attention_mask.shape}")
-        if past_key_values is not None:
-            print(f"      • past_key_values: {len(past_key_values)} layers")
-            print(f"        - Layer 0 Key: {past_key_values[0][0].shape} [batch, heads, seq_len, head_dim]")
-            print(f"        - Layer 0 Value: {past_key_values[0][1].shape} [batch, heads, seq_len, head_dim]")
-            print(f"        - Cached sequence length: {past_key_values[0][0].shape[2]} tokens")
-        else:
-            print(f"      • past_key_values: None")
-        if cache_position is not None:
-            print(f"      • cache_position: {cache_position.shape} = {cache_position.tolist()}")
-        else:
-            print(f"      • cache_position: None")
-        print(f"      • max_new_tokens: {max_new_tokens}")
-        print(f"      • temperature: {temperature}, top_p: {top_p}")
+        # Manual autoregressive loop
+        print(f"   🔄 [OPTION B] Starting autoregressive generation: {max_new_tokens} tokens")
+        generated_ids = []
+        lm_head = self.cache_model.get_output_embeddings()
         
-        outputs = self.cache_model.generate(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            max_new_tokens=max_new_tokens,
-            temperature=temperature,
-            top_p=top_p,
-            do_sample=True,
-            pad_token_id=self.tokenizer.pad_token_id,
-            return_dict_in_generate=True,
-            output_scores=False,
-            past_key_values=past_key_values,
-            cache_position=cache_position,  # ← FIX: Tell model where new tokens go!
-        )
-        print(f"\n   📐 [DIMENSIONS] Output dimensions from model.generate():")
-        print(f"      • sequences: {outputs.sequences.shape} (batch_size={outputs.sequences.shape[0]}, total_seq_len={outputs.sequences.shape[1]})")
-        if outputs.past_key_values is not None:
-            print(f"      • past_key_values: {len(outputs.past_key_values)} layers")
-            print(f"        - Layer 0 Key: {outputs.past_key_values[0][0].shape}")
-            print(f"        - Layer 0 Value: {outputs.past_key_values[0][1].shape}")
-            print(f"        - Final sequence length: {outputs.past_key_values[0][0].shape[2]} tokens")
-        print(f"   ✅ [LOCAL-MODEL of 9a] model.generate() complete")
+        for t in range(max_new_tokens):
+            # 1) Get logits from last_hidden
+            logits = lm_head(last_hidden)  # [B, vocab]
+            
+            # 2) Sample next token
+            next_token = self._sample_top_p(logits, top_p, temperature)  # [B, 1]
+            generated_ids.append(next_token)
+            
+            # Check for EOS
+            if (next_token == self.tokenizer.eos_token_id).all():
+                print(f"   🛑 [OPTION B] EOS reached at step {t+1}/{max_new_tokens}")
+                break
+            
+            # 3) Forward pass with single token to update cache
+            attention_mask_step = torch.ones((batch_size, current_len + 1), dtype=torch.long, device=self.device)
+            outputs = self.cache_model(
+                input_ids=next_token,
+                attention_mask=attention_mask_step,
+                past_key_values=past,
+                use_cache=True,
+                output_hidden_states=True,
+                return_dict=True,
+            )
+            past = outputs.past_key_values
+            last_hidden = outputs.hidden_states[-1][:, -1, :]
+            current_len += 1
+            
+            if (t + 1) % 50 == 0 or t == 0:
+                print(f"   📊 [OPTION B] Generated {t+1}/{max_new_tokens} tokens, cache_len={current_len}")
         
-        # Decode generated text (LatentMAS lines 254-260)
-        sequences = outputs.sequences
+        # Concatenate generated tokens
+        generated_ids = torch.cat(generated_ids, dim=-1)  # [B, T]
+        print(f"\n   📐 [DIMENSIONS] Generation complete:")
+        print(f"      • generated_ids: {generated_ids.shape}")
+        print(f"      • final cache length: {past[0][0].shape[2]} tokens")
+        
+        # Decode generated text
         generations: List[str] = []
-        for idx, length in enumerate(prompt_lengths):
-            length = int(length)
-            generated_ids = sequences[idx, length:]
-            text = self.tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
+        for idx in range(batch_size):
+            text = self.tokenizer.decode(generated_ids[idx], skip_special_tokens=True).strip()
             generations.append(text)
         
-        print(f"   ✅ [LOCAL-MODEL] Generated {len(generations[0])} characters using cache tensors")
+        print(f"   ✅ [LOCAL-MODEL] Generated {len(generations[0])} characters (Option B: no prompt duplication)")
         print(f"   📝 [LOCAL-MODEL] Generated text preview: {generations[0][:150]}...")
-        return generations, outputs.past_key_values
+        return generations, past
+    
+    # @torch.no_grad()
+    # def generate_text_batch(
+    #     self,
+    #     input_ids: torch.Tensor,
+    #     attention_mask: Optional[torch.Tensor] = None,
+    #     max_new_tokens: int = 256,
+    #     temperature: float = 0.7,
+    #     top_p: float = 0.95,
+    #     past_key_values: Optional[Tuple] = None,
+    # ) -> Tuple[List[str], Optional[Tuple]]:
+    #     """
+    #     Generate text using LOCAL model with cache tensors DIRECTLY
+    #     EXACT implementation from LatentMAS models.py:216-265
+        
+    #     This is the REAL cache usage - tensors are passed directly to model.generate()
+    #     """
+    #     print(f"\n   🎯 [STEP 9a] HybridCacheModel.generate_text_batch() - Generating text using cache TENSORS directly")
+        
+    #     if input_ids.dim() != 2:
+    #         raise ValueError("input_ids must be 2D with shape [batch, seq_len]")
+    #     if attention_mask is None:
+    #         attention_mask = torch.ones_like(input_ids, device=self.device)
+        
+    #     prompt_lengths = attention_mask.sum(dim=1).tolist()
+        
+    #     # Handle past_key_values and cache_position
+    #     cache_position = None
+    #     if past_key_values is not None:
+    #         past_len = past_key_values[0][0].shape[-2]
+    #         print(f"   🔗 [LOCAL-MODEL of 9a] Using key values cache tensors: {len(past_key_values)} layers, {past_len} tokens")
+    #         # Create cache_position for new tokens
+    #         cache_position = torch.arange(
+    #             past_len,
+    #             past_len + input_ids.shape[-1],
+    #             dtype=torch.long,
+    #             device=self.device,
+    #         )
+    #         # Create attention mask for past + current tokens
+    #         past_mask = torch.ones(
+    #             (attention_mask.shape[0], past_len),
+    #             dtype=attention_mask.dtype,
+    #             device=attention_mask.device,
+    #         )
+    #         attention_mask = torch.cat([past_mask, attention_mask], dim=-1)
+    #     else:
+    #         print(f"   🆕 [LOCAL-MODEL of 9a] No cache")
+        
+    #     # Generate with cache tensors (LatentMAS lines 244-253)
+    #     print(f"   ⚙️ [LOCAL-MODEL of 9a] Calling model.generate() with cache tensors...")
+    #     print(f"\n   📐 [DIMENSIONS] Input dimensions for model.generate():")
+    #     print(f"      • input_ids: {input_ids.shape} (batch_size={input_ids.shape[0]}, seq_len={input_ids.shape[1]})")
+    #     print(f"      • attention_mask: {attention_mask.shape}")
+    #     if past_key_values is not None:
+    #         print(f"      • past_key_values: {len(past_key_values)} layers")
+    #         print(f"        - Layer 0 Key: {past_key_values[0][0].shape} [batch, heads, seq_len, head_dim]")
+    #         print(f"        - Layer 0 Value: {past_key_values[0][1].shape} [batch, heads, seq_len, head_dim]")
+    #         print(f"        - Cached sequence length: {past_key_values[0][0].shape[2]} tokens")
+    #     else:
+    #         print(f"      • past_key_values: None")
+    #     if cache_position is not None:
+    #         print(f"      • cache_position: {cache_position.shape} = {cache_position.tolist()}")
+    #     else:
+    #         print(f"      • cache_position: None")
+    #     print(f"      • max_new_tokens: {max_new_tokens}")
+    #     print(f"      • temperature: {temperature}, top_p: {top_p}")
+
+    #     outputs = self.cache_model.generate(
+    #         input_ids=input_ids,
+    #         attention_mask=attention_mask,
+    #         max_new_tokens=max_new_tokens,
+    #         temperature=temperature,
+    #         top_p=top_p,
+    #         do_sample=True,
+    #         pad_token_id=self.tokenizer.pad_token_id,
+    #         return_dict_in_generate=True,
+    #         output_scores=False,
+    #         past_key_values=past_key_values,
+    #         cache_position=cache_position,  # ← FIX: Tell model where new tokens go!
+    #     )
+    #     print(f"\n   📐 [DIMENSIONS] Output dimensions from model.generate():")
+    #     print(f"      • sequences: {outputs.sequences.shape} (batch_size={outputs.sequences.shape[0]}, total_seq_len={outputs.sequences.shape[1]})")
+    #     if outputs.past_key_values is not None:
+    #         print(f"      • past_key_values: {len(outputs.past_key_values)} layers")
+    #         print(f"        - Layer 0 Key: {outputs.past_key_values[0][0].shape}")
+    #         print(f"        - Layer 0 Value: {outputs.past_key_values[0][1].shape}")
+    #         print(f"        - Final sequence length: {outputs.past_key_values[0][0].shape[2]} tokens")
+    #     print(f"   ✅ [LOCAL-MODEL of 9a] model.generate() complete")
+        
+    #     # Decode generated text (LatentMAS lines 254-260)
+    #     sequences = outputs.sequences
+    #     generations: List[str] = []
+    #     for idx, length in enumerate(prompt_lengths):
+    #         length = int(length)
+    #         generated_ids = sequences[idx, length:]
+    #         text = self.tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
+    #         generations.append(text)
+        
+    #     print(f"   ✅ [LOCAL-MODEL] Generated {len(generations[0])} characters using cache tensors")
+    #     print(f"   📝 [LOCAL-MODEL] Generated text preview: {generations[0][:150]}...")
+    #     return generations, outputs.past_key_values
+
+        
+    
     
     async def generate_text_batch_api(
         self,
