@@ -227,8 +227,9 @@ class HybridCacheModel:
         print(f"      • Final past_key_values: {len(past)} layers, seq_len={final_seq_len}")
         print(f"        - Layer 0 Key: {past[0][0].shape}")
         print(f"        - Layer 0 Value: {past[0][1].shape}")
+        print(f"      • Final last_hidden (boundary state): {last_hidden.shape}")
         print(f"   ✅ [LOCAL-MODEL] Cache generation complete: {len(past)} layers, {final_seq_len} tokens")
-        return past  # LatentMAS line 380
+        return past, last_hidden  # Return both cache and boundary hidden state
     
     def _sample_top_p(self, logits: torch.Tensor, top_p: float, temperature: float) -> torch.Tensor:
         """Sample from top-p (nucleus) distribution"""
@@ -252,13 +253,15 @@ class HybridCacheModel:
         temperature: float = 0.7,
         top_p: float = 0.95,
         past_key_values: Optional[Tuple] = None,
+        init_hidden: Optional[torch.Tensor] = None,  # NEW: boundary hidden state from cache
     ) -> Tuple[List[str], Optional[Tuple]]:
         """
         Generate text using LOCAL model with cache tensors DIRECTLY
         Option B: Manual autoregressive decoding from cache end (no prompt duplication)
         
-        This avoids re-feeding the prompt by starting generation directly from
-        the last hidden state of the cache.
+        Args:
+            init_hidden: If provided with past_key_values, skips redundant forward pass
+                        and uses this as the boundary hidden state for generation.
         """
         print(f"\n   🎯 [STEP 9a] HybridCacheModel.generate_text_batch() - Manual autoregressive decoding (Option B)")
         
@@ -272,28 +275,35 @@ class HybridCacheModel:
         
         # Get initial state from cache
         if past_key_values is not None:
-            past_len = past_key_values[0][0].shape[-2]
+            past = past_key_values
+            past_len = past[0][0].shape[-2]
             print(f"   🔗 [LOCAL-MODEL of 9a] Using cache: {len(past_key_values)} layers, {past_len} tokens")
             print(f"   ⚠️  [OPTION B] Starting generation from cache end (NO prompt re-feeding)")
             
-            # Get last hidden state by doing ONE forward pass with the prompt
-            # This is needed to get the hidden state at the cache boundary
-            print(f"   📍 [OPTION B] Getting initial hidden state from prompt...")
-            outputs = self.cache_model(
-                input_ids=input_ids,
-                attention_mask=torch.cat([
-                    torch.ones((batch_size, past_len), dtype=torch.long, device=self.device),
-                    attention_mask
-                ], dim=-1),
-                past_key_values=past_key_values,
-                use_cache=True,
-                output_hidden_states=True,
-                return_dict=True,
-            )
-            past = outputs.past_key_values
-            last_hidden = outputs.hidden_states[-1][:, -1, :]  # [B, D]
-            current_len = past[0][0].shape[2]
-            print(f"   ✅ [OPTION B] Initial state ready: cache_len={current_len}, hidden={last_hidden.shape}")
+            if init_hidden is not None:
+                # Use provided boundary hidden state - NO redundant forward pass!
+                last_hidden = init_hidden
+                current_len = past_len
+                print(f"   ✅ [OPTION B] Using provided boundary hidden state: cache_len={current_len}, hidden={last_hidden.shape}")
+                print(f"   ✨ [OPTION B] ZERO prompt duplication - starting directly from cache end!")
+            else:
+                # Fallback: do redundant forward pass (for backward compatibility)
+                print(f"   ⚠️  [OPTION B] No init_hidden provided - doing redundant forward pass...")
+                outputs = self.cache_model(
+                    input_ids=input_ids,
+                    attention_mask=torch.cat([
+                        torch.ones((batch_size, past_len), dtype=torch.long, device=self.device),
+                        attention_mask
+                    ], dim=-1),
+                    past_key_values=past_key_values,
+                    use_cache=True,
+                    output_hidden_states=True,
+                    return_dict=True,
+                )
+                past = outputs.past_key_values
+                last_hidden = outputs.hidden_states[-1][:, -1, :]  # [B, D]
+                current_len = past[0][0].shape[2]
+                print(f"   ✅ [OPTION B] Initial state ready: cache_len={current_len}, hidden={last_hidden.shape}")
         else:
             print(f"   🆕 [LOCAL-MODEL of 9a] No cache - starting from scratch")
             outputs = self.cache_model(
@@ -529,6 +539,7 @@ class HybridCacheModel:
         messages: List[Dict],
         attention_mask: Optional[torch.Tensor] = None,
         past_key_values: Optional[Tuple] = None,
+        init_hidden: Optional[torch.Tensor] = None,  # NEW: boundary hidden state
         max_tokens: int = 256,
     ) -> Tuple[List[str], Optional[Tuple]]:
         """
@@ -549,6 +560,7 @@ class HybridCacheModel:
             input_ids,
             attention_mask=attention_mask,
             past_key_values=past_key_values,  # ← Real cache usage!
+            init_hidden=init_hidden,  # ← NEW: Pass boundary hidden state
             max_new_tokens=max_tokens,
         )
         
