@@ -155,25 +155,35 @@ class CacheGraph(Graph):
         # Collect caches from predecessors (graph-guided)
         sharer_caches = []
         edge_weights = []
+        print(f"\n   🔍 Iterating through {len(node.spatial_predecessors)} spatial predecessors...")
         for pred in node.spatial_predecessors:
+            print(f"      • pred type: {type(pred)}, pred.id: {pred.id} (type: {type(pred.id)})")
             if pred.id in self.node_caches:
                 cache = self.node_caches[pred.id]
                 if cache is not None:
-                    print(f"   ✅ Found cache from {pred.id} ({len(cache)} layers)")
+                    print(f"        ✅ Found cache from {pred.id} ({len(cache)} layers)")
+                    if isinstance(cache, tuple) and len(cache) > 0:
+                        print(f"           📐 Cache dimensions: Layer 0 Key={cache[0][0].shape}, Value={cache[0][1].shape}")
                     sharer_caches.append(cache)
                     # Use GCN edge weights if available
                     edge_weight = self.gcn.get_edge_weight(pred.id, node.id) if hasattr(self, 'gcn') else 1.0
+                    print(f"           ⚖️  Edge weight from {pred.id} to {node.id}: {edge_weight}")
+                    print(f"           📏 edge_weight type: {type(edge_weight)}, is scalar: {not hasattr(edge_weight, 'shape')}")
                     edge_weights.append(edge_weight)
             else:
-                print(f"   ❌ No cache from {pred.id}")
+                print(f"        ❌ No cache from {pred.id}")
         
         if not sharer_caches:
             print(f"   ⚠️ No predecessor caches available")
             return None
         
+        print(f"\n   📊 Collected {len(sharer_caches)} caches from predecessors")
+        print(f"      • Raw edge_weights: {edge_weights}")
+        
         # Normalize edge weights
         total_weight = sum(edge_weights)
         edge_weights = [w / total_weight for w in edge_weights]
+        print(f"      • Normalized edge_weights: {edge_weights} (sum={sum(edge_weights):.2f})")
         
         # Fuse caches using learnable fusion
         print(f"   🧪 Fusing {len(sharer_caches)} caches with weights {edge_weights}")
@@ -188,6 +198,14 @@ class CacheGraph(Graph):
                     print(f"        Key shape: {k_shape}, Value shape: {v_shape}")
                 else:
                     print(f"      - Cache {i+1} from {pred.id}: weight={edge_weights[i]:.2f}, layers={len(cache)}")
+        
+        print(f"   🔍 [DIMENSIONS] Before cache_fuser call:")
+        print(f"      • sharer_caches: list of {len(sharer_caches)} caches")
+        if sharer_caches and isinstance(sharer_caches[0], tuple):
+            print(f"        - Each cache: {len(sharer_caches[0])} layers (tuple of (key, value) pairs)")
+            print(f"        - Layer 0 Key: {sharer_caches[0][0][0].shape}")
+            print(f"        - Layer 0 Value: {sharer_caches[0][0][1].shape}")
+        print(f"      • edge_weights: {edge_weights} (length={len(edge_weights)})")
         
         fused = self.cache_fuser(sharer_caches, edge_weights)
         
