@@ -118,7 +118,7 @@ class HybridCacheLLM:
         print(f"\n🔗 [STEP 8] HybridCacheLLM - Calling hybrid_model.generate_latent_batch(input_ids, attention_mask)")
         print(f"   🔍 input_ids shape: {input_ids.shape}, first 10 tokens: {input_ids[0][:10].tolist()}")
         print(f"   🔍 attention_mask shape: {attention_mask.shape}, first 10: {attention_mask[0][:10].tolist()}")
-        cache_kv = self.hybrid_model.generate_latent_batch(
+        cache_kv, last_hidden = self.hybrid_model.generate_latent_batch(
             input_ids,
             attention_mask,
             latent_steps=latent_steps,
@@ -165,7 +165,8 @@ class HybridCacheLLM:
                 input_ids,
                 attention_mask=attention_mask,
                 past_key_values=cache_kv,
-                max_new_tokens=kwargs.get("max_tokens", 1024)
+                max_new_tokens=kwargs.get("max_tokens", 1024),
+                init_hidden=last_hidden
             )
         else:  # api_hint
             # API_HINT: API with text hint
