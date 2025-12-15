@@ -92,7 +92,7 @@ async def main():
     
     # Setup agents
     if args.use_cache:
-        agent_names = ['MathSolverCache'] * sum(args.agent_nums)
+        agent_names = ['MathSolverCacheV2'] * sum(args.agent_nums)
         print(f"✅ Using cache-enabled agents")
     else:
         agent_names = ['MathSolver'] * sum(args.agent_nums)

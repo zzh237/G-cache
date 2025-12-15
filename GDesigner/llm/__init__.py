@@ -2,6 +2,7 @@ from GDesigner.llm.llm_registry import LLMRegistry
 from GDesigner.llm.gpt_chat import GPTChat
 from GDesigner.llm.llm_cache_api import QwenAPI
 from GDesigner.llm.llm_cache_hybrid import HybridCacheLLM
+from GDesigner.llm.llm_cache_hybrid_v2 import HybridCacheLLMV2
 from GDesigner.llm.llm_cache_local import LocalCacheLLM
 
 # Placeholder for VisualLLMRegistry (not implemented yet)
@@ -12,5 +13,6 @@ __all__ = ["LLMRegistry",
            "GPTChat",
            "QwenAPI",
            "HybridCacheLLM",
+           "HybridCacheLLMV2",
            "LocalCacheLLM",
            "VisualLLMRegistry"]
