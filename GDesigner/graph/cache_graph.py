@@ -78,13 +78,23 @@ class CacheFuser(nn.Module):
         if not seq_lengths:
             return None
         
-        # If sequence lengths differ, use LatentMAS approach: take first cache only
-        # (LatentMAS doesn't fuse - it passes sequentially)
+        # If sequence lengths differ, truncate all to shortest length (LatentMAS-inspired)
         if len(set(seq_lengths)) > 1:
-            print(f"   ⚠️ Sequence length mismatch: {seq_lengths}. Using first cache only (LatentMAS-style).")
-            return sharer_caches[0]
+            min_len = min(seq_lengths)
+            print(f"   ⚠️ Sequence length mismatch: {seq_lengths}. Truncating all to {min_len} tokens.")
+            truncated_caches = []
+            for cache in sharer_caches:
+                truncated_layers = []
+                for k, v in cache:
+                    # Keep only the last min_len tokens
+                    k_truncated = k[..., -min_len:, :].contiguous()
+                    v_truncated = v[..., -min_len:, :].contiguous()
+                    truncated_layers.append((k_truncated, v_truncated))
+                truncated_caches.append(tuple(truncated_layers))
+            sharer_caches = truncated_caches
+            seq_lengths = [min_len] * len(sharer_caches)
         
-        # All caches have same length - safe to fuse
+        # Now all caches have same length - safe to fuse
         # Use actual number of layers from cache, not self.num_layers
         actual_num_layers = len(sharer_caches[0])
         print(f"   📊 Detected {actual_num_layers} layers in cache (fuser has {self.num_layers} params)")
@@ -162,16 +172,16 @@ class CacheGraph(Graph):
             if pred.id in self.node_caches:
                 cache = self.node_caches[pred.id]
                 if cache is not None:
-                    print(f"        ✅ Found cache from {pred.id} ({len(cache)} layers)")
-                    print(f"           🔍 cache type: {type(cache)}")
-                    print(f"           🔍 is tuple: {isinstance(cache, tuple)}, is list: {isinstance(cache, list)}")
-                    if isinstance(cache, (tuple, list)) and len(cache) > 0:
-                        print(f"           📐 Cache dimensions: Layer 0 Key={cache[0][0].shape}, Value={cache[0][1].shape}")
+                    # print(f"        ✅ Found cache from {pred.id} ({len(cache)} layers)")
+                    # print(f"           🔍 cache type: {type(cache)}")
+                    # print(f"           🔍 is tuple: {isinstance(cache, tuple)}, is list: {isinstance(cache, list)}")
+                    # if isinstance(cache, (tuple, list)) and len(cache) > 0:
+                    #     print(f"           📐 Cache dimensions: Layer 0 Key={cache[0][0].shape}, Value={cache[0][1].shape}")
                     sharer_caches.append(cache)
                     # Use GCN edge weights if available
                     edge_weight = self.gcn.get_edge_weight(pred.id, node.id) if hasattr(self, 'gcn') else 1.0
-                    print(f"           ⚖️  Edge weight from {pred.id} to {node.id}: {edge_weight}")
-                    print(f"           📏 edge_weight type: {type(edge_weight)}, is scalar: {not hasattr(edge_weight, 'shape')}")
+                    # print(f"           ⚖️  Edge weight from {pred.id} to {node.id}: {edge_weight}")
+                    # print(f"           📏 edge_weight type: {type(edge_weight)}, is scalar: {not hasattr(edge_weight, 'shape')}")
                     edge_weights.append(edge_weight)
                     collected.append((pred.id, cache, float(edge_weight)))
             else:
@@ -203,14 +213,15 @@ class CacheGraph(Graph):
         #             print(f"        Key shape: {k_shape}, Value shape: {v_shape}")
         #         else:
         #             print(f"      - Cache {i+1} from {pred.id}: weight={edge_weights[i]:.2f}, layers={len(cache)}")
+        print(f"   🔍 [DIMENSIONS] Before cache_fuser call:")
+        print(f"      • sharer_caches: list of {len(sharer_caches)} caches")
         for i, (pid, cache, w) in enumerate(normed):
             k_shape, v_shape = cache[0][0].shape, cache[0][1].shape
             print(f"  - Cache {i+1} from {pid}: lenght={len(cache)} weight={w:.2f}")
             print(f"    Key shape: {k_shape}, Value shape: {v_shape}")
 
 
-        print(f"   🔍 [DIMENSIONS] Before cache_fuser call:")
-        print(f"      • sharer_caches: list of {len(sharer_caches)} caches")
+        
         # if sharer_caches and isinstance(sharer_caches[0], tuple):
         #     print(f"        - Each cache: {len(sharer_caches[0])} layers (tuple of (key, value) pairs)")
         #     print(f"        - Layer 0 Key: {sharer_caches[0][0][0].shape}")
