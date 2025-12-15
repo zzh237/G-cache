@@ -38,8 +38,8 @@ def parse_args():
     # Use absolute path for dataset (relative to project root)
     default_dataset = os.path.join(project_root, "gcache_data/gsm8k/gsm8k.jsonl")
     parser.add_argument("--dataset_json", type=str, default=default_dataset)
-    parser.add_argument("--llm_name", type=str, default="hybrid_cache",
-                        help="LLM mode: hybrid_cache (small GPU+API), qwen-plus (API only), local_cache (local only)")
+    parser.add_argument("--llm_name", type=str, default="hybrid_cache_v2",
+                        help="LLM mode: hybrid_cache_v2 (small GPU+API v2), qwen-plus (API only), local_cache (local only)")
     parser.add_argument('--mode', type=str, default='FullConnected')
     parser.add_argument('--lr', type=float, default=0.1)
     parser.add_argument('--batch_size', type=int, default=1)  # Set to 1 for single data test
@@ -71,8 +71,10 @@ async def main():
     print("="*80)
     print(f"Mode: {args.llm_name}")
     print(f"Cache enabled: {args.use_cache}")
-    if args.llm_name == "hybrid_cache":
-        print(f"Backend: Small local model (cache) + API (text)")
+    if args.llm_name == "hybrid_cache_v2":
+        print(f"Backend: Small local model (cache) + API (text) [V2]")
+    elif args.llm_name == "hybrid_cache":
+        print(f"Backend: Small local model (cache) + API (text) [V1 - deprecated]")
     elif args.llm_name in ["qwen-plus", "qwen-turbo"]:
         print(f"Backend: API only (text-based cache)")
     elif args.llm_name == "local_cache":
