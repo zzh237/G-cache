@@ -86,9 +86,25 @@ async def main():
     current_time = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
     Time.instance().value = current_time
     
-    result_dir = Path(f"{GDesigner_ROOT}/result/gsm8k")
+    # Setup directories (same structure as results)
+    result_dir = Path(f"{GDesigner_ROOT}/result/{args.domain}")
     result_dir.mkdir(parents=True, exist_ok=True)
     result_file = result_dir / f"cache_API_{args.domain}_{current_time}.json"
+    
+    log_dir = Path(f"{GDesigner_ROOT}/log/{args.domain}")
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / f"cache_API_{args.domain}_{current_time}.log"
+    
+    # Setup dual logger (console + file) with custom path
+    from GDesigner.utils.log import DualLogger
+    logger = DualLogger.__new__(DualLogger)
+    logger.log_path = log_file
+    logger.log_file = open(log_file, 'w', encoding='utf-8')
+    logger.original_stdout = sys.stdout
+    logger.original_stderr = sys.stderr
+    sys.stdout = logger
+    sys.stderr = logger
+    print(f"📝 Logging to: {log_file}")
     
     # Setup agents
     if args.use_cache:
@@ -281,6 +297,10 @@ async def main():
     print(f"Solved: {total_solved}/{total_executed}")
     print(f"Results saved to: {result_file}")
     print(f"{'='*80}")
+    
+    # Close logger
+    logger.close()
+    print(f"📝 Log saved to: {logger.log_path}")
 
 
 if __name__ == '__main__':
