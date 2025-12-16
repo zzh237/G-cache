@@ -118,10 +118,10 @@ class MathSolverCacheV2(Node):
                 graph.store_node_cache(self.id, kv_cache)
                 print(f"\n💾 [STEP 10] Stored cache for node {self.id}")
             
-            # For intermediate agents, response is empty - generate placeholder text
+            # For intermediate agents, response is empty - return empty string
             if self.agent_type == "intermediate":
-                print(f"\n⏭️  [INTERMEDIATE] No text output - returning placeholder")
-                return f"[Agent {self.id}: Cache generated, {len(kv_cache)} layers, {kv_cache[0][0].shape[2]} tokens]"
+                print(f"\n⏭️  [INTERMEDIATE] No text output - cache is the real output")
+                return ""  # Empty output - cache communication is via graph.node_caches, not text
             else:
                 print(f"\n✅ [JUDGER] Returning text output: {len(response)} chars")
                 return response

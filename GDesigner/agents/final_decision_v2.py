@@ -37,7 +37,13 @@ class FinalReferCacheV2(Node):
         
         spatial_str = ""
         for id, info in spatial_info.items():
-            spatial_str += id + ": " + info['output'] + "\n\n"
+            # Skip empty outputs from intermediate agents (they only generate cache)
+            if info['output'].strip():
+                spatial_str += id + ": " + info['output'] + "\n\n"
+        
+        # If no text outputs, add a note
+        if not spatial_str.strip():
+            spatial_str = "[Note: Intermediate agents generated cache only, no text outputs available]\n\n"
         
         decision_few_shot = self.prompt_set.get_decision_few_shot()
         user_prompt = f"{decision_few_shot} The task is:\n\n {raw_inputs['task']}.\n At the same time, the output of other agents is as follows:\n\n{spatial_str}"

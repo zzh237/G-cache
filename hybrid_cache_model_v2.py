@@ -442,7 +442,7 @@ class HybridCacheModel:
         print(f"\n   ⭐ [TO_TEXT] Using TRUE hybrid approach...")
         
         # Step 1: Generate with local model using REAL cache
-        print(f"   📍 [TO_TEXT] {agent_label} Local model with real cache tensors, past_key_values, call generate_text_batch()")
+        print(f"   📍 [TO_TEXT-CACHE] {agent_label} Local model with real cache tensors, past_key_values, call generate_text_batch()")
         local_text, new_cache = self.generate_text_batch(
             input_ids,
             attention_mask=attention_mask,
@@ -453,8 +453,8 @@ class HybridCacheModel:
         )
         
         # Step 2: Use local output as context for API
-        print(f"   📍 [TO_TEXT] {agent_label} Step 2: API refinement with cache converted text as context")
-        print(f"   🔍 [TO_TEXT] {agent_label} Cache converted text preview: {local_text[0][:150]}...")
+        print(f"   📍 [TO_TEXT-API] {agent_label} Step 2: API refinement with cache converted text as context")
+        # print(f"   🔍 [TO_TEXT] {agent_label} Cache converted text preview: {local_text[0][:150]}...")
         messages = messages.copy()
         if messages and messages[-1].get("role") == "user":
             original_user_msg = messages[-1]["content"]
@@ -470,6 +470,7 @@ class HybridCacheModel:
             past_key_values=None,  # Don't send cache to API (already used by local)
             max_tokens=max_tokens,
         )
+        print(f"   📝 [TO_TEXT-API] {agent_label} Generated text preview: {api_text[0][:10000]}...") if len(api_text[0]) > 10000 else print(f"   📝 [NEW_RESPONSES] {agent_label} Generated text preview: {api_text[0]}")
         
-        print(f"   ✅ [TO_TEXT] Complete! Local cache used + API refined")
+        print(f"   ✅ [TO_TEXT-API] Complete! Local cache used + API refined")
         return api_text, new_cache  # Best of both worlds!
