@@ -111,7 +111,7 @@ class FinalReferCacheV2(Node):
             print(f"   ========== SYSTEM PROMPT ==========")
             print(f"   {system_prompt}")
             print(f"   ========== USER PROMPT ==========")
-            print(f"   {user_prompt[:500]}...") if len(user_prompt) > 500 else print(f"   {user_prompt}")
+            print(f"   {user_prompt[:2500]}...") if len(user_prompt) > 2500 else print(f"   {user_prompt}")
             print(f"   ========== AGENT RESPONSE ==========")
             print(f"   {response}")
             print(f"   ====================================")
