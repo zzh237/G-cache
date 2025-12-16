@@ -375,13 +375,13 @@ class HybridCacheModel:
         Returns:
             (text_list, None) - API doesn't return cache
         """
-        print(f"\n   🔄 [STEP 9b] [{agent_label}] HybridCacheModel.generate_text_batch_api() - Converting cache to text context using API")
+        print(f"\n   🔄 [TEXT_TO_API] [{agent_label}] HybridCacheModel.generate_text_batch_api() - Converting cache to text context using API")
         
         # Inject cache context if available
         if past_key_values:
             # Cache is a TUPLE of (key, value) pairs, one per layer
             # Each key/value is a torch.Tensor with shape [batch, heads, seq_len, hidden_dim]
-            print(f"   🔍 [DEBUG] Cache structure: past_key_values type: {type(past_key_values)}")
+            print(f"   🔍 [TEXT_TO_API] Cache structure: past_key_values type: {type(past_key_values)}")
             print(f"      - Type: tuple of {len(past_key_values)} layers")
             print(f"      - Layer 0 type: {type(past_key_values[0])}")
             print(f"      - Layer 0 key shape: {past_key_values[0][0].shape}")
@@ -403,10 +403,10 @@ class HybridCacheModel:
                 print(f"      Original: {original_content[:100]}...")
                 print(f"      Modified: {messages[-1]['content'][:150]}...")
         else:
-            print(f"   ⚠️ [API-CACHE] No cache used - API will be the solo source past_key_values type: {type(past_key_values)}")
+            print(f"   ⚠️ [TEXT_TO_API] No cache used - API will be the solo source past_key_values type: {type(past_key_values)}")
         
         # Generate with API
-        print(f"   🌐 [API] Calling {self.api_model_name} API (NOT using cache directly, only text context)...")
+        print(f"   🌐 [TEXT_TO_API] Calling {self.api_model_name} API (NOT using cache directly, only text context)...")
         response = await self.api_client.chat.completions.create(
             model=self.api_model_name,
             messages=messages,
@@ -415,8 +415,8 @@ class HybridCacheModel:
         )
         
         text = response.choices[0].message.content
-        print(f"   ✅ [API] Received response: {len(text)} characters")
-        print(f"   📝 [API] Response preview: {text[:150]}...")
+        print(f"   ✅ [TEXT_TO_API] Received response: {len(text)} characters")
+        # print(f"   📝 [API] Response preview: {text[:150]}...")
         return [text], None
     
     async def generate_text_batch_hybrid(
@@ -458,11 +458,11 @@ class HybridCacheModel:
         messages = messages.copy()
         if messages and messages[-1].get("role") == "user":
             original_user_msg = messages[-1]["content"]
-            print(f"   🔍 [TO_TEXT] Original user message: {original_user_msg[:100]}...")
+            print(f"   🔍 [TO_TEXT-API] Original user message: {original_user_msg[:100]}...")
             context = f"Previous reasoning from local model:\n{local_text[0]}\n\n"
-            print(f"   🔍 [TO_TEXT] Cache converted: {context[:100]}... with text length: {len(context)} chars")
+            print(f"   🔍 [TO_TEXT-API] Cache converted: {context[:100]}... with text length: {len(context)} chars")
             messages[-1]["content"] = context + messages[-1]["content"]
-            print(f"   🔍 [TO_TEXT] Modified user message: {messages[-1]['content'][:150]}...")
+            print(f"   🔍 [TO_TEXT-API] Modified user message: {messages[-1]['content'][:150]}...")
         
         # Step 3: Get high-quality output from API
         api_text, _ = await self.generate_text_batch_api(
