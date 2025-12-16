@@ -268,6 +268,11 @@ class CacheGraph(Graph):
         node_ids = ', '.join(self.nodes.keys())
         print(f"   ✅ Set graph reference on {len(self.nodes)} nodes: [{node_ids}]")
         
+        # Also set graph reference on decision node (created in parent __init__)
+        if hasattr(self, 'decision_node') and self.decision_node:
+            self.decision_node.graph = self
+            print(f"   ✅ Set graph reference on decision node: {self.decision_node.id}")
+        
         # Call parent's arun
         print(f"   ➡️  Calling parent Graph.arun()...")
         return await super().arun(input, num_rounds, max_tries, max_time)
