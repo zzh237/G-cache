@@ -111,9 +111,11 @@ async def main():
     # Setup agents
     if args.use_cache:
         agent_names = ['MathSolverCacheV2'] * sum(args.agent_nums)
-        print(f"✅ Using cache-enabled agents")
+        decision_method = 'FinalReferCacheV2'  # Use cache-aware decision agent
+        print(f"✅ Using cache-enabled agents (including decision agent)")
     else:
         agent_names = ['MathSolver'] * sum(args.agent_nums)
+        decision_method = args.decision_method  # Use standard decision method
         print(f"📝 Using text-only agents (baseline)")
     
     kwargs = get_kwargs(args.mode, len(agent_names))
@@ -148,7 +150,7 @@ async def main():
         domain="gsm8k",
         llm_name=args.llm_name,
         agent_names=agent_names,
-        decision_method=args.decision_method,
+        decision_method=decision_method,
         optimized_spatial=args.optimized_spatial,
         optimized_temporal=False,
         use_cache_communication=args.use_cache,
