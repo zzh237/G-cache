@@ -5,6 +5,7 @@ from GDesigner.agents.math_solver_cache import MathSolverCache
 from GDesigner.agents.math_solver_cache_v2 import MathSolverCacheV2
 from GDesigner.agents.adversarial_agent import AdverarialAgent
 from GDesigner.agents.final_decision import FinalRefer,FinalDirect,FinalWriteCode,FinalMajorVote
+from GDesigner.agents.final_decision_v2 import FinalReferCacheV2
 from GDesigner.agents.agent_registry import AgentRegistry
 
 __all__ =  ['AnalyzeAgent',
@@ -14,6 +15,7 @@ __all__ =  ['AnalyzeAgent',
             'MathSolverCacheV2',
             'AdverarialAgent',
             'FinalRefer',
+            'FinalReferCacheV2',
             'FinalDirect',
             'FinalWriteCode',
             'FinalMajorVote',
