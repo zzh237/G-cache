@@ -250,7 +250,7 @@ class HybridCacheModel:
         
         This is the REAL cache usage - tensors are passed directly to model.generate()
         """
-        print(f"\n   🎯 [STEP 9a] [{agent_label}] HybridCacheModel.generate_text_batch() - Generating text using cache TENSORS directly")
+        print(f"\n   🎯 [TO_TEXT] [{agent_label}] HybridCacheModel.generate_text_batch() - Generating text using cache TENSORS directly")
         
         if input_ids.dim() != 2:
             raise ValueError("input_ids must be 2D with shape [batch, seq_len]")
@@ -263,7 +263,7 @@ class HybridCacheModel:
         cache_position = None
         if past_key_values is not None:
             past_len = past_key_values[0][0].shape[-2]
-            print(f"   🔗 [LOCAL-MODEL of 9a] Using key values cache tensors: {len(past_key_values)} layers, {past_len} tokens")
+            print(f"   🔗 [TO_TEXT] Using key values cache tensors: {len(past_key_values)} layers, {past_len} tokens")
             # Create cache_position for new tokens
             cache_position = torch.arange(
                 past_len,
@@ -279,11 +279,11 @@ class HybridCacheModel:
             )
             attention_mask = torch.cat([past_mask, attention_mask], dim=-1)
         else:
-            print(f"   🆕 [LOCAL-MODEL of 9a] No cache")
+            print(f"   🆕 [TO_TEXT] No cache")
         
         # Generate with cache tensors (LatentMAS lines 244-253)
-        print(f"   ⚙️ [LOCAL-MODEL of 9a] Calling model.generate() with cache tensors...")
-        print(f"\n   📐 [DIMENSIONS] Input dimensions for model.generate():")
+        print(f"   ⚙️ [TO_TEXT] Calling model.generate() with cache tensors...")
+        print(f"\n   📐 [PAST+INPUTS] Input dimensions for model.generate():")
         print(f"      • input_ids: {input_ids.shape} (batch_size={input_ids.shape[0]}, seq_len={input_ids.shape[1]})")
         print(f"      • attention_mask: {attention_mask.shape} = {past_len}+{input_ids.shape[1]}")
         if past_key_values is not None:
@@ -349,6 +349,8 @@ class HybridCacheModel:
         
         print(f"   ✅ [NEW_RESPONSES] {agent_label} Generated {len(generations[0])} characters using cache tensors")
         print(f"   📝 [NEW_RESPONSES] {agent_label} Generated text preview: {generations[0][:10000]}...") if len(generations[0]) > 10000 else print(f"   📝 [NEW_RESPONSES] {agent_label} Generated text preview: {generations[0]}")
+        print(f"   📝 [NEW_RESPONSES] generation finished")
+        
         return generations, outputs.past_key_values
 
         
@@ -437,29 +439,30 @@ class HybridCacheModel:
         
         Best of both worlds!
         """
-        print(f"\n   ⭐ [HYBRID] Using TRUE hybrid approach...")
+        print(f"\n   ⭐ [TO_TEXT] Using TRUE hybrid approach...")
         
         # Step 1: Generate with local model using REAL cache
-        print(f"   📍 [HYBRID] {agent_label} Local model with real cache tensors, past_key_values, call generate_text_batch()")
+        print(f"   📍 [TO_TEXT] {agent_label} Local model with real cache tensors, past_key_values, call generate_text_batch()")
         local_text, new_cache = self.generate_text_batch(
             input_ids,
             attention_mask=attention_mask,
             past_key_values=past_key_values,  # ← Real cache usage!
             init_hidden=init_hidden,  # ← NEW: Pass boundary hidden state
             max_new_tokens=max_tokens,
+            agent_label=agent_label,
         )
         
         # Step 2: Use local output as context for API
-        print(f"   📍 [HYBRID] {agent_label} Step 2: API refinement with cache converted text as context")
-        print(f"   🔍 [HYBRID] {agent_label} Cache converted text preview: {local_text[0][:150]}...")
+        print(f"   📍 [TO_TEXT] {agent_label} Step 2: API refinement with cache converted text as context")
+        print(f"   🔍 [TO_TEXT] {agent_label} Cache converted text preview: {local_text[0][:150]}...")
         messages = messages.copy()
         if messages and messages[-1].get("role") == "user":
             original_user_msg = messages[-1]["content"]
-            print(f"   🔍 [HYBRID] Original user message: {original_user_msg[:100]}...")
+            print(f"   🔍 [TO_TEXT] Original user message: {original_user_msg[:100]}...")
             context = f"Previous reasoning from local model:\n{local_text[0]}\n\n"
-            print(f"   🔍 [HYBRID] Cache converted: {context[:100]}... with text length: {len(context)} chars")
+            print(f"   🔍 [TO_TEXT] Cache converted: {context[:100]}... with text length: {len(context)} chars")
             messages[-1]["content"] = context + messages[-1]["content"]
-            print(f"   🔍 [HYBRID] Modified user message: {messages[-1]['content'][:150]}...")
+            print(f"   🔍 [TO_TEXT] Modified user message: {messages[-1]['content'][:150]}...")
         
         # Step 3: Get high-quality output from API
         api_text, _ = await self.generate_text_batch_api(
@@ -468,5 +471,5 @@ class HybridCacheModel:
             max_tokens=max_tokens,
         )
         
-        print(f"   ✅ [HYBRID] Complete! Local cache used + API refined")
+        print(f"   ✅ [TO_TEXT] Complete! Local cache used + API refined")
         return api_text, new_cache  # Best of both worlds!

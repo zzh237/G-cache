@@ -83,6 +83,13 @@ class HybridCacheLLMV2:
         agent_label = f"Agent {agent_id}" if agent_id else "Agent"
         print(f"\n📦 [STEP 7] HybridCacheLLMV2.agen_with_cache() - {agent_label}, Type: {agent_type}")
         
+        print(f"\n📝 [STEP 7] Full conversation context for Agent {agent_id}:")
+        print(f"   ========== SYSTEM PROMPT ==========")
+        print(f"   {messages[0]['content']}")
+        print(f"   ========== USER PROMPT ==========")
+        print(f"   {messages[1]['content'][:10000]}...") if len(messages[1]['content']) > 10000 else print(f"   {messages[1]['content']}")
+        print(f"   ========== AGENT RESPONSE ==========")
+
         # Tokenize prompt
         prompt = self._messages_to_text(messages)
         max_length = getattr(self.tokenizer, 'model_max_length', 2048)
@@ -99,7 +106,7 @@ class HybridCacheLLMV2:
         input_ids = encoded["input_ids"].to(self.hybrid_model.device)
         attention_mask = encoded["attention_mask"].to(self.hybrid_model.device)
         
-        print(f"   ✅ [{agent_label}] Tokenized to {input_ids.shape[1]} tokens")
+        print(f"   ✅ [INPUTS_IDS: {agent_label}] Tokenized to {input_ids.shape[1]} tokens")
         
         # Branch based on agent type (LatentMAS pattern)
         if agent_type == "intermediate":
@@ -111,8 +118,8 @@ class HybridCacheLLMV2:
                 latent_steps=latent_steps,
                 past_key_values=past_key_values,
             )
-            print(f"   ✅ Generated cache: {len(cache_kv)} layers, seq_len={cache_kv[0][0].shape[2]}")
-            print(f"   ⏭️  Skipping text generation (intermediate agent)")
+            print(f"   ✅  [intermediate] Generated cache: {len(cache_kv)} layers, seq_len={cache_kv[0][0].shape[2]}")
+            print(f"   ⏭️  [intermediate] Skipping text generation (intermediate agent)")
             return "", cache_kv
         
         else:  # judger
