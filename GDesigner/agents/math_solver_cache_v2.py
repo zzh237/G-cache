@@ -21,13 +21,17 @@ class MathSolverCacheV2(Node):
                  agent_type: str = "intermediate",  # NEW: "intermediate" or "judger"
                  cache_mode: str = "hybrid", 
                  generation_mode: str = "api_hint", 
-                 max_new_tokens: int = 512):
+                 max_new_tokens: int = 512,
+                 latent_only: bool = False,  # NEW: Keep only latent tokens
+                 latent_steps: int = 10):  # NEW: Number of latent steps
         """
         Args:
             agent_type: "intermediate" (cache only) or "judger" (cache + text)
             cache_mode: "hybrid" (text+cache), "latent_only" (cache only), "text_only" (no cache)
             generation_mode: "api_hint", "hybrid", "local" (only used for judger)
             max_new_tokens: Maximum tokens to generate (only for judger)
+            latent_only: If True, only keep latent tokens (discard input tokens)
+            latent_steps: Number of latent reasoning steps
         """
         super().__init__(id, "MathSolverCacheV2", domain, llm_name)
         
@@ -45,6 +49,29 @@ class MathSolverCacheV2(Node):
         self.cache_mode = cache_mode
         self.generation_mode = generation_mode
         self.max_new_tokens = max_new_tokens
+        self.latent_only = latent_only
+        self.latent_steps = latent_steps
+    
+    @staticmethod
+    def _slice_tensor(tensor, tokens_to_keep: int):
+        """Slice tensor to keep only last N tokens (LatentMAS-style)"""
+        if tokens_to_keep <= 0:
+            return tensor[..., 0:0, :].contiguous()
+        keep = min(tokens_to_keep, tensor.shape[-2])
+        start = tensor.shape[-2] - keep
+        return tensor[..., start:, :].contiguous()
+    
+    def _truncate_past(self, past_kv: Optional[Tuple], tokens_to_keep: int) -> Optional[Tuple]:
+        """Truncate past_key_values to keep only last N tokens (LatentMAS-style)"""
+        if past_kv is None or tokens_to_keep <= 0:
+            return None
+        trimmed_layers = []
+        for layer in past_kv:
+            if isinstance(layer, tuple):
+                trimmed_layers.append(tuple(self._slice_tensor(t, tokens_to_keep) for t in layer))
+            else:
+                trimmed_layers.append(layer)
+        return tuple(trimmed_layers)
     
     def _process_inputs(self, raw_inputs: Dict[str, str], 
                        spatial_info: Dict[str, Dict], 
@@ -106,14 +133,22 @@ class MathSolverCacheV2(Node):
             response, kv_cache = await self.llm.agen_with_cache(
                 messages, 
                 past_key_values=past_kv,
-                latent_steps=10,
+                latent_steps=self.latent_steps,
                 agent_type=self.agent_type,  # NEW: Pass agent type!
                 generation_mode=self.generation_mode,
                 max_tokens=self.max_new_tokens,
                 agent_id=self.id,  # NEW: Pass agent ID for logging
             )
             
-            # Step 4: Store cache for successors
+            # Step 4: Truncate cache if latent_only mode (LatentMAS-style)
+            if self.latent_only and kv_cache is not None:
+                print(f"\n✂️  [INTERMEDIATE] Truncating cache to keep only {self.latent_steps} latent tokens")
+                original_len = kv_cache[0][0].shape[2]
+                kv_cache = self._truncate_past(kv_cache, self.latent_steps)
+                new_len = kv_cache[0][0].shape[2] if kv_cache else 0
+                print(f"   📊 [INTERMEDIATE] Cache truncated: {original_len} → {new_len} tokens")
+            
+            # Step 5: Store cache for successors
             if graph and hasattr(graph, 'store_node_cache'):
                 graph.store_node_cache(self.id, kv_cache)
                 print(f"\n💾 [STEP 10] Stored cache for node {self.id}")

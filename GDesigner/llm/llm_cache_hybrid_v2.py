@@ -124,8 +124,8 @@ class HybridCacheLLMV2:
         
         else:  # judger
             # Judger: Only generate text (NO latent cache generation, uses existing cache)
-            print(f"\n📝 [STEP 8] {agent_label} (judger) - Calling generate_text_batch() only (no latent generation)")
-            print(f"   🔗 Using accumulated cache from predecessors: {len(past_key_values)} layers" if past_key_values else "   🆕 No cache from predecessors")
+            print(f"\n📝 [STEP 8 TO_TEXT] {agent_label} (judger) - Calling generate_text_batch() only (no latent generation)")
+            print(f"   🔗 [TO_TEXT] Using accumulated cache from predecessors: {len(past_key_values)} layers" if past_key_values else "   🆕 No cache from predecessors")
             
             if generation_mode == "hybrid":
                 text, cache_kv = await self.hybrid_model.generate_text_batch_hybrid(

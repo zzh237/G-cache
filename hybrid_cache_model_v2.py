@@ -283,7 +283,7 @@ class HybridCacheModel:
         
         # Generate with cache tensors (LatentMAS lines 244-253)
         print(f"   ⚙️ [TO_TEXT] Calling model.generate() with cache tensors...")
-        print(f"\n   📐 [PAST+INPUTS] Input dimensions for model.generate():")
+        print(f"\n   📐 [TO_TEXT:PAST+INPUTS] Input dimensions for model.generate():")
         print(f"      • input_ids: {input_ids.shape} (batch_size={input_ids.shape[0]}, seq_len={input_ids.shape[1]})")
         print(f"      • attention_mask: {attention_mask.shape} = {past_len}+{input_ids.shape[1]}")
         if past_key_values is not None:
@@ -317,7 +317,7 @@ class HybridCacheModel:
             past_key_values=past_key_values,
             cache_position=cache_position,  # ← FIX: Tell model where new tokens go!
         )
-        print(f"\n   📐 [TO_TEXT] Output dimensions from model.generate():")
+        print(f"\n   📐 [TO_TEXT:OUTPUT] Output dimensions from model.generate():")
         input_seq_len = input_ids.shape[1]
         output_seq_len = outputs.sequences.shape[1]
         new_tokens = output_seq_len - input_seq_len
@@ -357,8 +357,8 @@ class HybridCacheModel:
         
         # Print all decoded texts
         print(f"   ✅ [TO_TEXT] {agent_label} Generated {len(generations[0])} characters using cache tensors")
-        print(f"   📝 [TO_TEXT] {agent_label} INPUT TEXT ({len(input_texts[0])} chars): {input_texts[0][:10000]}...") if len(input_texts[0]) > 10000 else print(f"   📝 [TO_TEXT] {agent_label} INPUT TEXT: {input_texts[0]}")
-        print(f"   📝 [TO_TEXT] {agent_label} Generated text: {generations[0][:20000]}...") if len(generations[0]) > 20000 else print(f"   📝 [TO_TEXT] {agent_label} Generated text: {generations[0]}")
+        print(f"   📝 [TO_TEXT] {agent_label} INPUT TEXT ({len(input_texts[0])} chars): {input_texts[0][:20000]}...") if len(input_texts[0]) > 20000 else print(f"   📝 [TO_TEXT] {agent_label} INPUT TEXT: {input_texts[0]}")
+        print(f"   📝 [TO_TEXT] {agent_label} OUTPUT TEXT: {generations[0][:20000]}...") if len(generations[0]) > 20000 else print(f"   📝 [TO_TEXT] {agent_label} OUTPUT TEXT: {generations[0]}")
         print(f"   📝 [TO_TEXT] generation finished")
         
         return generations, outputs.past_key_values
