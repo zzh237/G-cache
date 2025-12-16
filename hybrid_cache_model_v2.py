@@ -317,7 +317,7 @@ class HybridCacheModel:
             past_key_values=past_key_values,
             cache_position=cache_position,  # ← FIX: Tell model where new tokens go!
         )
-        print(f"\n   📐 [DIMENSIONS] Output dimensions from model.generate():")
+        print(f"\n   📐 [NEW_RESPONSES] Output dimensions from model.generate():")
         input_seq_len = input_ids.shape[1]
         output_seq_len = outputs.sequences.shape[1]
         new_tokens = output_seq_len - input_seq_len
@@ -335,19 +335,20 @@ class HybridCacheModel:
             else:
                 print(f"        - Final kv cache length: {final_cache_len} tokens")
                 print(f"          = input_tokens({input_seq_len}) + new_tokens({new_tokens})")
-        print(f"   ✅ [LOCAL-MODEL of 9a] model.generate() complete")
+        print(f"   ✅ [NEW_RESPONSES] model.generate() complete")
         
         # Decode generated text (LatentMAS lines 254-260)
         sequences = outputs.sequences
         generations: List[str] = []
         for idx, length in enumerate(prompt_lengths):
             length = int(length)
+            print(f"       [NEW_RESPONSES] INPUT TOKENS length are new_tokens({length})")
             generated_ids = sequences[idx, length:]
             text = self.tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
             generations.append(text)
         
-        print(f"   ✅ [LOCAL-MODEL] {agent_label} Generated {len(generations[0])} characters using cache tensors")
-        print(f"   📝 [LOCAL-MODEL] {agent_label} Generated text preview: {generations[0][:150]}...")
+        print(f"   ✅ [NEW_RESPONSES] {agent_label} Generated {len(generations[0])} characters using cache tensors")
+        print(f"   📝 [NEW_RESPONSES] {agent_label} Generated text preview: {generations[0][:10000]}...") if len(generations[0]) > 10000 else print(f"   📝 [NEW_RESPONSES] {agent_label} Generated text preview: {generations[0]}")
         return generations, outputs.past_key_values
 
         
