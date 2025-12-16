@@ -317,7 +317,7 @@ class HybridCacheModel:
             past_key_values=past_key_values,
             cache_position=cache_position,  # ← FIX: Tell model where new tokens go!
         )
-        print(f"\n   📐 [NEW_RESPONSES] Output dimensions from model.generate():")
+        print(f"\n   📐 [TO_TEXT] Output dimensions from model.generate():")
         input_seq_len = input_ids.shape[1]
         output_seq_len = outputs.sequences.shape[1]
         new_tokens = output_seq_len - input_seq_len
@@ -335,21 +335,21 @@ class HybridCacheModel:
             else:
                 print(f"        - Final kv cache length: {final_cache_len} tokens")
                 print(f"          = input_tokens({input_seq_len}) + new_tokens({new_tokens})")
-        print(f"   ✅ [NEW_RESPONSES] model.generate() complete")
+        print(f"   ✅ [TO_TEXT] model.generate() complete")
         
         # Decode generated text (LatentMAS lines 254-260)
         sequences = outputs.sequences
         generations: List[str] = []
         for idx, length in enumerate(prompt_lengths):
             length = int(length)
-            print(f"       [NEW_RESPONSES] INPUT TOKENS length are new_tokens({length})")
+            print(f"       [TO_TEXT] INPUT TOKENS length are new_tokens({length})")
             generated_ids = sequences[idx, length:]
             text = self.tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
             generations.append(text)
         
-        print(f"   ✅ [NEW_RESPONSES] {agent_label} Generated {len(generations[0])} characters using cache tensors")
-        print(f"   📝 [NEW_RESPONSES] {agent_label} Generated text preview: {generations[0][:10000]}...") if len(generations[0]) > 10000 else print(f"   📝 [NEW_RESPONSES] {agent_label} Generated text preview: {generations[0]}")
-        print(f"   📝 [NEW_RESPONSES] generation finished")
+        print(f"   ✅ [TO_TEXT] {agent_label} Generated {len(generations[0])} characters using cache tensors")
+        print(f"   📝 [TO_TEXT] {agent_label} Generated text preview: {generations[0][:10000]}...") if len(generations[0]) > 10000 else print(f"   📝 [NEW_RESPONSES] {agent_label} Generated text preview: {generations[0]}")
+        print(f"   📝 [TO_TEXT] generation finished")
         
         return generations, outputs.past_key_values
 
@@ -458,11 +458,11 @@ class HybridCacheModel:
         messages = messages.copy()
         if messages and messages[-1].get("role") == "user":
             original_user_msg = messages[-1]["content"]
-            print(f"   🔍 [TO_TEXT-API] Original user message: {original_user_msg[:100]}...")
+            print(f"   🔍 [TO_TEXT-API] Original user message: {original_user_msg[:100]}...{original_user_msg[-100:]} with text length: {len(original_user_msg)} chars")100
             context = f"Previous reasoning from local model:\n{local_text[0]}\n\n"
-            print(f"   🔍 [TO_TEXT-API] Cache converted: {context[:100]}... with text length: {len(context)} chars")
+            print(f"   🔍 [TO_TEXT-API] TO_TEXT: {context[:100]}...{context[-100:]} with text length: {len(context)} chars")
             messages[-1]["content"] = context + messages[-1]["content"]
-            print(f"   🔍 [TO_TEXT-API] Modified user message: {messages[-1]['content'][:150]}...")
+            print(f"   🔍 [TO_TEXT-API] Modified user message: {messages[-1]['content'][:150]}...{messages[-1]['content'][-150:]}")
         
         # Step 3: Get high-quality output from API
         api_text, _ = await self.generate_text_batch_api(
