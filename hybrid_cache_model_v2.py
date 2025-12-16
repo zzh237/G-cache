@@ -285,7 +285,7 @@ class HybridCacheModel:
         print(f"   ⚙️ [LOCAL-MODEL of 9a] Calling model.generate() with cache tensors...")
         print(f"\n   📐 [DIMENSIONS] Input dimensions for model.generate():")
         print(f"      • input_ids: {input_ids.shape} (batch_size={input_ids.shape[0]}, seq_len={input_ids.shape[1]})")
-        print(f"      • attention_mask: {attention_mask.shape} = {attention_mask.shape[0]}+{past_len}")
+        print(f"      • attention_mask: {attention_mask.shape} = {past_len}+{input_ids.shape[1]}")
         if past_key_values is not None:
             print(f"      • past_key_values: {len(past_key_values)} layers")
             print(f"        - Layer 0 Key: {past_key_values[0][0].shape} [batch, heads, seq_len, head_dim]")
