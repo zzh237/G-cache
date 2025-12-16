@@ -43,7 +43,7 @@ class FinalReferCacheV2(Node):
         
         # If no text outputs, add a note
         if not spatial_str.strip():
-            spatial_str = "[Note: Intermediate agents generated cache only, no text outputs available]\n\n"
+            spatial_str = "[Note: Intermediate agents generated latent cache is used to generate the response]\n\n"
         
         decision_few_shot = self.prompt_set.get_decision_few_shot()
         user_prompt = f"{decision_few_shot} The task is:\n\n {raw_inputs['task']}.\n At the same time, the output of other agents is as follows:\n\n{spatial_str}"

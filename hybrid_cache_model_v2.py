@@ -408,7 +408,7 @@ class HybridCacheModel:
             messages = messages.copy()
             if messages and messages[-1].get("role") == "user":
                 original_content = messages[-1]["content"]
-                messages[-1]["content"] = cache_info + "\n\n" + original_content
+                messages[-1]["content"] = original_content + "\n\n" + cache_info
                 print(f"   📋 [API-CACHE] Modified prompt preview:")
                 print(f"      Original: {original_content[:100]}...")
                 print(f"      Modified: {messages[-1]['content'][:150]}...")
