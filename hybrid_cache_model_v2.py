@@ -340,15 +340,25 @@ class HybridCacheModel:
         # Decode generated text (LatentMAS lines 254-260)
         sequences = outputs.sequences
         generations: List[str] = []
+        input_texts: List[str] = []
+        
         for idx, length in enumerate(prompt_lengths):
             length = int(length)
-            print(f"       [TO_TEXT] INPUT TOKENS length are new_tokens({length})")
+            
+            # Decode input tokens
+            input_token_ids = sequences[idx, :length]
+            input_text = self.tokenizer.decode(input_token_ids, skip_special_tokens=True).strip()
+            input_texts.append(input_text)
+            
+            # Decode generated tokens
             generated_ids = sequences[idx, length:]
             text = self.tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
             generations.append(text)
         
+        # Print all decoded texts
         print(f"   ✅ [TO_TEXT] {agent_label} Generated {len(generations[0])} characters using cache tensors")
-        print(f"   📝 [TO_TEXT] {agent_label} Generated text preview: {generations[0][:10000]}...") if len(generations[0]) > 10000 else print(f"   📝 [NEW_RESPONSES] {agent_label} Generated text preview: {generations[0]}")
+        print(f"   📝 [TO_TEXT] {agent_label} INPUT TEXT ({len(input_texts[0])} chars): {input_texts[0][:10000]}...") if len(input_texts[0]) > 10000 else print(f"   📝 [TO_TEXT] {agent_label} INPUT TEXT: {input_texts[0]}")
+        print(f"   📝 [TO_TEXT] {agent_label} Generated text: {generations[0][:20000]}...") if len(generations[0]) > 20000 else print(f"   📝 [TO_TEXT] {agent_label} Generated text: {generations[0]}")
         print(f"   📝 [TO_TEXT] generation finished")
         
         return generations, outputs.past_key_values
