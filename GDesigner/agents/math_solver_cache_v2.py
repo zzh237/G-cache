@@ -110,6 +110,7 @@ class MathSolverCacheV2(Node):
                 agent_type=self.agent_type,  # NEW: Pass agent type!
                 generation_mode=self.generation_mode,
                 max_tokens=self.max_new_tokens,
+                agent_id=self.id,  # NEW: Pass agent ID for logging
             )
             
             # Step 4: Store cache for successors

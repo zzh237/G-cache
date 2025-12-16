@@ -98,6 +98,7 @@ class FinalReferCacheV2(Node):
                 agent_type="judger",  # NEW: Judger mode!
                 generation_mode=self.generation_mode,
                 max_tokens=self.max_new_tokens,
+                agent_id=self.id,  # NEW: Pass agent ID for logging
             )
             
             # Store cache for potential future use (though judger is usually last)
@@ -106,7 +107,14 @@ class FinalReferCacheV2(Node):
                 print(f"\n💾 [STEP 11.5] Stored cache for judger node {self.id}")
             
             print(f"\n✅ [STEP 11.6] Judger decision complete: {len(response)} chars")
-            print(f"   📄 Response preview: {response[:200]}...")
+            print(f"\n📝 [STEP 11.7] Full conversation context for Agent {self.id}:")
+            print(f"   ========== SYSTEM PROMPT ==========")
+            print(f"   {system_prompt}")
+            print(f"   ========== USER PROMPT ==========")
+            print(f"   {user_prompt[:500]}...") if len(user_prompt) > 500 else print(f"   {user_prompt}")
+            print(f"   ========== AGENT RESPONSE ==========")
+            print(f"   {response}")
+            print(f"   ====================================")
             return response
         else:
             # Fallback: text-only

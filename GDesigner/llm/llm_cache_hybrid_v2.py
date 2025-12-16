@@ -66,6 +66,7 @@ class HybridCacheLLMV2:
         latent_steps: int = 10,
         agent_type: str = "intermediate",  # NEW: "intermediate" or "judger"
         generation_mode: str = "api_hint",
+        agent_id: str = None,  # NEW: Agent identifier for logging
         **kwargs
     ) -> Tuple[str, Tuple]:
         """
@@ -74,11 +75,13 @@ class HybridCacheLLMV2:
         Args:
             agent_type: "intermediate" (latent cache only) or "judger" (text only, uses cache)
             generation_mode: "api_hint", "hybrid", "local" (only used for judger)
+            agent_id: Agent identifier for logging
         
         Returns:
             (text_response, kv_cache)
         """
-        print(f"\n📦 [STEP 7] HybridCacheLLMV2.agen_with_cache() - Agent type: {agent_type}")
+        agent_label = f"Agent {agent_id}" if agent_id else "Agent"
+        print(f"\n📦 [STEP 7] HybridCacheLLMV2.agen_with_cache() - {agent_label}, Type: {agent_type}")
         
         # Tokenize prompt
         prompt = self._messages_to_text(messages)
@@ -96,12 +99,12 @@ class HybridCacheLLMV2:
         input_ids = encoded["input_ids"].to(self.hybrid_model.device)
         attention_mask = encoded["attention_mask"].to(self.hybrid_model.device)
         
-        print(f"   ✅ Tokenized to {input_ids.shape[1]} tokens")
+        print(f"   ✅ [{agent_label}] Tokenized to {input_ids.shape[1]} tokens")
         
         # Branch based on agent type (LatentMAS pattern)
         if agent_type == "intermediate":
             # Intermediate: Only generate latent cache (NO text generation)
-            print(f"\n🔗 [STEP 8] Intermediate agent - Calling generate_latent_batch() only")
+            print(f"\n🔗 [STEP 8] {agent_label} (intermediate) - Calling generate_latent_batch() only")
             cache_kv, last_hidden = self.hybrid_model.generate_latent_batch(
                 input_ids,
                 attention_mask,
@@ -114,7 +117,7 @@ class HybridCacheLLMV2:
         
         else:  # judger
             # Judger: Only generate text (NO latent cache generation, uses existing cache)
-            print(f"\n📝 [STEP 8] Judger agent - Calling generate_text_batch() only (no latent generation)")
+            print(f"\n📝 [STEP 8] {agent_label} (judger) - Calling generate_text_batch() only (no latent generation)")
             print(f"   🔗 Using accumulated cache from predecessors: {len(past_key_values)} layers" if past_key_values else "   🆕 No cache from predecessors")
             
             if generation_mode == "hybrid":
@@ -124,7 +127,8 @@ class HybridCacheLLMV2:
                     attention_mask=attention_mask,
                     past_key_values=past_key_values,  # Use input cache directly
                     init_hidden=None,  # No init_hidden since we didn't call generate_latent_batch
-                    max_tokens=kwargs.get("max_tokens", 4096)
+                    max_tokens=kwargs.get("max_tokens", 4096),
+                    agent_label=agent_label
                 )
             elif generation_mode == "local":
                 text, cache_kv = self.hybrid_model.generate_text_batch(
@@ -132,13 +136,15 @@ class HybridCacheLLMV2:
                     attention_mask=attention_mask,
                     past_key_values=past_key_values,  # Use input cache directly
                     max_new_tokens=kwargs.get("max_tokens", 1024),
-                    init_hidden=None  # No init_hidden
+                    init_hidden=None,  # No init_hidden
+                    agent_label=agent_label
                 )
             else:  # api_hint
                 text, _ = await self.hybrid_model.generate_text_batch_api(
                     messages,
                     past_key_values=past_key_values,  # Use input cache directly
-                    max_tokens=kwargs.get("max_tokens", 1024)
+                    max_tokens=kwargs.get("max_tokens", 1024),
+                    agent_label=agent_label
                 )
                 cache_kv = past_key_values  # Return input cache unchanged
             

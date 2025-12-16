@@ -208,14 +208,11 @@ async def main():
             # Reuse same graph for all tasks (models can't be deepcopied)
             answer_log_probs.append(asyncio.create_task(graph.arun(input_dict, args.num_rounds)))
         
-        print(f"\n⏳ [STEP 12] Waiting for graph.arun() to complete for {len(answer_log_probs)} tasks...")
+        print(f"\n⏳ [STEP 0.1] Waiting for graph.arun() to complete for {len(answer_log_probs)} tasks...")
         raw_results = await asyncio.gather(*answer_log_probs)
         raw_answers, log_probs = zip(*raw_results)
         
         print(f"\n🏁 [STEP 13] Graph execution complete - received {len(raw_answers)} responses")
-        for idx, (ans, prob) in enumerate(zip(raw_answers, log_probs)):
-            print(f"   📝 Task {idx+1} response preview: {str(ans[0])}...")
-        
         # Compute metrics
         loss_list = []
         utilities = []
@@ -223,11 +220,10 @@ async def main():
         
         print(f"\n📊 [STEP 14] Processing results and computing metrics...")
         for idx, (task, answer, log_prob, true_answer) in enumerate(zip(current_batch, raw_answers, log_probs, answers)):
-            print(f"\n🔍 [DEBUG] Extracting answer from response...")
+            print(f"\n🔍 [DEBUG] Extracting answer from Task {idx+1} response {str(answer[0])}...")
             extracted = extract_gpqa_answer(answer[0])
             predict_answer = normalize_answer(extracted) if extracted else None
             print(f"   Extracted: '{predict_answer}', Expected: '{true_answer}'")
-            print(f"   Raw response snippet: {answer[0][-200:]}")
             # Exact match - both already normalized
             is_solved = (predict_answer == true_answer) if predict_answer and true_answer else False
             total_solved += is_solved
@@ -264,19 +260,18 @@ async def main():
                 try:
                     optimizer.zero_grad()
                     total_loss.backward()
-                    # Clip gradients to prevent NaN/Inf
                     torch.nn.utils.clip_grad_norm_(params, max_norm=1.0)
                     optimizer.step()
                 except RuntimeError as e:
-                    print(f"⚠️ Backprop error: {e}")
-                    print(f"Skipping optimization step")
+                    print(f"   ⚠️ Backprop error: {e}")
         else:
             total_loss = torch.tensor(0.0)
         
-        print(f"⏱️  Batch time: {time.time() - start_ts:.3f}s")
-        print(f"📊 Accuracy: {accuracy:.4f}")
-        print(f"📉 Loss: {total_loss.item():.4f}")
-        print(f"✅ Solved: {total_solved}/{total_executed}")
+        print(f"\n📊 [BATCH/UPDATE {i_batch}] Summary:")
+        print(f"   ⏱️  Batch time: {time.time() - start_ts:.3f}s")
+        print(f"   📊 Cumulative Accuracy: {accuracy:.4f} ({total_solved}/{total_executed})")
+        print(f"   📉 Batch Loss: {total_loss.item():.4f}")
+        print(f"   ✅ Batch Solved: {sum(utilities)}/{len(utilities)}")
     
     print(f"\n{'='*80}")
     print(f"✅ FINAL RESULTS")

@@ -221,15 +221,11 @@ async def main():
             # Reuse same graph for all tasks (models can't be deepcopied)
             answer_log_probs.append(asyncio.create_task(graph.arun(input_dict, args.num_rounds)))
         
-        print(f"\n⏳ [STEP 12] Waiting for graph.arun() to complete for {len(answer_log_probs)} tasks...")
+        print(f"\n⏳ [STEP 0.1] Waiting for graph.arun() to complete for {len(answer_log_probs)} tasks...")
         raw_results = await asyncio.gather(*answer_log_probs)
         raw_answers, log_probs = zip(*raw_results)
         
         print(f"\n🏁 [STEP 13] Graph execution complete - received {len(raw_answers)} responses")
-        for idx, (ans, prob) in enumerate(zip(raw_answers, log_probs)):
-            # print(f"   📝 Task {idx+1} response preview: {str(ans[0])[:150]}...")
-            print(f"   📝 Task {idx+1} response preview: {str(ans[0])}...")
-        
         # Compute metrics
         loss_list = []
         utilities = []
@@ -240,8 +236,8 @@ async def main():
         print(f"   📏 Number of tasks in this batch: {len(current_batch)}")
         
         print(f"\n📊 [STEP 14] Processing results and computing metrics...")
-        for task, answer, log_prob, true_answer in zip(current_batch, raw_answers, log_probs, answers):
-            print(f"\n🔍 [DEBUG] Extracting answer from response...")
+        for idx, (task, answer, log_prob, true_answer) in enumerate(zip(current_batch, raw_answers, log_probs, answers)):
+            print(f"\n🔍 [DEBUG] Extracting answer from Task {idx+1} response {str(answer[0])}...")
             predict_answer = gsm_get_predict(answer[0])
             print(f"   Extracted: '{predict_answer}', Expected: '{true_answer}'")
             is_solved = float(predict_answer) == float(true_answer)

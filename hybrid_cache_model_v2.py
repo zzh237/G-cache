@@ -242,6 +242,7 @@ class HybridCacheModel:
         top_p: float = 0.95,
         past_key_values: Optional[Tuple] = None,
         init_hidden: Optional[torch.Tensor] = None,  # Ignored in V2 (for compatibility)
+        agent_label: str = "Agent",  # NEW: Agent label for logging
     ) -> Tuple[List[str], Optional[Tuple]]:
         """
         Generate text using LOCAL model with cache tensors DIRECTLY
@@ -249,7 +250,7 @@ class HybridCacheModel:
         
         This is the REAL cache usage - tensors are passed directly to model.generate()
         """
-        print(f"\n   🎯 [STEP 9a] HybridCacheModel.generate_text_batch() - Generating text using cache TENSORS directly")
+        print(f"\n   🎯 [STEP 9a] [{agent_label}] HybridCacheModel.generate_text_batch() - Generating text using cache TENSORS directly")
         
         if input_ids.dim() != 2:
             raise ValueError("input_ids must be 2D with shape [batch, seq_len]")
@@ -284,7 +285,7 @@ class HybridCacheModel:
         print(f"   ⚙️ [LOCAL-MODEL of 9a] Calling model.generate() with cache tensors...")
         print(f"\n   📐 [DIMENSIONS] Input dimensions for model.generate():")
         print(f"      • input_ids: {input_ids.shape} (batch_size={input_ids.shape[0]}, seq_len={input_ids.shape[1]})")
-        print(f"      • attention_mask: {attention_mask.shape}")
+        print(f"      • attention_mask: {attention_mask.shape} = {attention_mask.shape[0]}+{past_len}")
         if past_key_values is not None:
             print(f"      • past_key_values: {len(past_key_values)} layers")
             print(f"        - Layer 0 Key: {past_key_values[0][0].shape} [batch, heads, seq_len, head_dim]")
@@ -293,7 +294,11 @@ class HybridCacheModel:
         else:
             print(f"      • past_key_values: None")
         if cache_position is not None:
-            print(f"      • cache_position: {cache_position.shape} = {cache_position.tolist()}")
+            pos_list = cache_position.tolist()
+            if len(pos_list) > 10:
+                print(f"      • cache_position: {cache_position.shape} = [{pos_list[0]}, {pos_list[1]}, ..., {pos_list[-2]}, {pos_list[-1]}]")
+            else:
+                print(f"      • cache_position: {cache_position.shape} = {pos_list}")
         else:
             print(f"      • cache_position: None")
         print(f"      • max_new_tokens: {max_new_tokens}")
@@ -313,12 +318,23 @@ class HybridCacheModel:
             cache_position=cache_position,  # ← FIX: Tell model where new tokens go!
         )
         print(f"\n   📐 [DIMENSIONS] Output dimensions from model.generate():")
-        print(f"      • sequences: {outputs.sequences.shape} (batch_size={outputs.sequences.shape[0]}, total_seq_len={outputs.sequences.shape[1]})")
+        input_seq_len = input_ids.shape[1]
+        output_seq_len = outputs.sequences.shape[1]
+        new_tokens = output_seq_len - input_seq_len
+        print(f"      • sequences: {outputs.sequences.shape} (batch_size={outputs.sequences.shape[0]}, total_seq_len={output_seq_len})")
+        print(f"        = input_tokens({input_seq_len}) + new_tokens({new_tokens})")
         if outputs.past_key_values is not None:
             print(f"      • past_key_values: {len(outputs.past_key_values)} layers")
             print(f"        - Layer 0 Key: {outputs.past_key_values[0][0].shape}")
             print(f"        - Layer 0 Value: {outputs.past_key_values[0][1].shape}")
-            print(f"        - Final sequence length: {outputs.past_key_values[0][0].shape[2]} tokens")
+            final_cache_len = outputs.past_key_values[0][0].shape[2]
+            if past_key_values is not None:
+                prev_cache_len = past_key_values[0][0].shape[2]
+                print(f"        - Final kv cache length: {final_cache_len} tokens")
+                print(f"          = predecessor_cache({prev_cache_len}) + input_tokens({input_seq_len}) + new_tokens({new_tokens})")
+            else:
+                print(f"        - Final kv cache length: {final_cache_len} tokens")
+                print(f"          = input_tokens({input_seq_len}) + new_tokens({new_tokens})")
         print(f"   ✅ [LOCAL-MODEL of 9a] model.generate() complete")
         
         # Decode generated text (LatentMAS lines 254-260)
@@ -330,8 +346,8 @@ class HybridCacheModel:
             text = self.tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
             generations.append(text)
         
-        print(f"   ✅ [LOCAL-MODEL] Generated {len(generations[0])} characters using cache tensors")
-        print(f"   📝 [LOCAL-MODEL] Generated text preview: {generations[0][:150]}...")
+        print(f"   ✅ [LOCAL-MODEL] {agent_label} Generated {len(generations[0])} characters using cache tensors")
+        print(f"   📝 [LOCAL-MODEL] {agent_label} Generated text preview: {generations[0][:150]}...")
         return generations, outputs.past_key_values
 
         
@@ -342,6 +358,7 @@ class HybridCacheModel:
         messages: List[Dict],
         past_key_values: Optional[Tuple] = None,
         max_tokens: int = 256,
+        agent_label: str = "Agent",  # NEW: Agent label for logging
     ) -> Tuple[List[str], None]:
         """
         Generate text using API with cache context
@@ -350,11 +367,12 @@ class HybridCacheModel:
             messages: Chat messages
             past_key_values: Real KV-cache from small local model
             max_tokens: Max tokens to generate
+            agent_label: Agent label for logging
         
         Returns:
             (text_list, None) - API doesn't return cache
         """
-        print(f"\n   🔄 [STEP 9b] HybridCacheModel.generate_text_batch_api() - Converting cache converted text to text context using API")
+        print(f"\n   🔄 [STEP 9b] [{agent_label}] HybridCacheModel.generate_text_batch_api() - Converting cache to text context using API")
         
         # Inject cache context if available
         if past_key_values:
@@ -406,6 +424,7 @@ class HybridCacheModel:
         past_key_values: Optional[Tuple] = None,
         init_hidden: Optional[torch.Tensor] = None,  # NEW: boundary hidden state
         max_tokens: int = 256,
+        agent_label: str = "Agent",  # NEW: Agent label for logging
     ) -> Tuple[List[str], Optional[Tuple]]:
         """
         TRUE Hybrid: Combine local model (real cache) + API (high quality)
@@ -420,7 +439,7 @@ class HybridCacheModel:
         print(f"\n   ⭐ [HYBRID] Using TRUE hybrid approach...")
         
         # Step 1: Generate with local model using REAL cache
-        print(f"   📍 [HYBRID] Local model with real cache tensors, past_key_values, call generate_text_batch()")
+        print(f"   📍 [HYBRID] {agent_label} Local model with real cache tensors, past_key_values, call generate_text_batch()")
         local_text, new_cache = self.generate_text_batch(
             input_ids,
             attention_mask=attention_mask,
@@ -430,16 +449,16 @@ class HybridCacheModel:
         )
         
         # Step 2: Use local output as context for API
-        print(f"   📍 [HYBRID] Step 2: API refinement with cache converted text as context")
-        print(f"   🔍 [HYBRID] Cache converted text preview: {local_text[0][:150]}...")
+        print(f"   📍 [HYBRID] {agent_label} Step 2: API refinement with cache converted text as context")
+        print(f"   🔍 [HYBRID] {agent_label} Cache converted text preview: {local_text[0][:150]}...")
         messages = messages.copy()
         if messages and messages[-1].get("role") == "user":
             original_user_msg = messages[-1]["content"]
             print(f"   🔍 [HYBRID] Original user message: {original_user_msg[:100]}...")
             context = f"Previous reasoning from local model:\n{local_text[0]}\n\n"
-            print(f"   🔍 [HYBRID] cache converted text length: {len(context)} chars, preview: {context[:100]}...")
+            print(f"   🔍 [HYBRID] Cache converted: {context[:100]}... with text length: {len(context)} chars")
             messages[-1]["content"] = context + messages[-1]["content"]
-            print(f"   🔍 [HYBRID] Modified user message (with cache converted text): {messages[-1]['content'][:150]}...")
+            print(f"   🔍 [HYBRID] Modified user message: {messages[-1]['content'][:150]}...")
         
         # Step 3: Get high-quality output from API
         api_text, _ = await self.generate_text_batch_api(
