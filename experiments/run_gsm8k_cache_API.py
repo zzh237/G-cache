@@ -139,8 +139,15 @@ async def main():
                 "max_new_tokens": max_tokens
             })
         print(f"📏 Token limits: Intermediate agents=512, Final agent=2048")
+        
+        # Decision agent kwargs (judger gets more tokens)
+        decision_kwargs = {
+            "generation_mode": args.generation_mode,
+            "max_new_tokens": 2048
+        }
     else:
         node_kwargs = [{} for _ in agent_names]
+        decision_kwargs = {}
     
     # Remove node_kwargs from kwargs if it exists to avoid duplicate
     kwargs.pop('node_kwargs', None)
@@ -157,6 +164,7 @@ async def main():
         hidden_dim=args.hidden_dim,
         num_cache_layers=args.num_cache_layers,
         node_kwargs=node_kwargs,
+        decision_kwargs=decision_kwargs,
         **kwargs
     )
     

@@ -46,6 +46,7 @@ class Graph(ABC):
                 initial_temporal_probability: float = 0.5,
                 fixed_temporal_masks:List[List[int]] = None,
                 node_kwargs:List[Dict] = None,
+                decision_kwargs:Dict = None,
                 verbose:bool = False,
                 ):
         
@@ -65,7 +66,11 @@ class Graph(ABC):
         self.optimized_spatial = optimized_spatial
         self.optimized_temporal = optimized_temporal
         self.verbose = verbose
-        self.decision_node:Node = AgentRegistry.get(decision_method, **{"domain":self.domain,"llm_name":self.llm_name})
+        # Create decision node with optional kwargs
+        decision_params = {"domain": self.domain, "llm_name": self.llm_name}
+        if decision_kwargs:
+            decision_params.update(decision_kwargs)
+        self.decision_node:Node = AgentRegistry.get(decision_method, **decision_params)
         self.nodes:Dict[str,Node] = {}
         self.potential_spatial_edges:List[List[str, str]] = []
         self.potential_temporal_edges:List[List[str,str]] = []
