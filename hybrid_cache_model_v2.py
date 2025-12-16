@@ -458,7 +458,7 @@ class HybridCacheModel:
         messages = messages.copy()
         if messages and messages[-1].get("role") == "user":
             original_user_msg = messages[-1]["content"]
-            print(f"   🔍 [TO_TEXT-API] Original user message: {original_user_msg[:100]}...{original_user_msg[-100:]} with text length: {len(original_user_msg)} chars")100
+            print(f"   🔍 [TO_TEXT-API] Original user message: {original_user_msg[:100]}...{original_user_msg[-100:]} with text length: {len(original_user_msg)} chars")
             context = f"Previous reasoning from local model:\n{local_text[0]}\n\n"
             print(f"   🔍 [TO_TEXT-API] TO_TEXT: {context[:100]}...{context[-100:]} with text length: {len(context)} chars")
             messages[-1]["content"] = context + messages[-1]["content"]
