@@ -61,6 +61,16 @@ class FinalReferCacheV2(Node):
         graph = getattr(self, 'graph', None)
         print(f"\n🏆 [STEP 11] FinalReferCacheV2 (Judger) - Aggregating {len(spatial_info)} agent outputs")
         
+        # Debug: Check graph attribute
+        print(f"\n🔍 [DEBUG] Checking graph attribute:")
+        print(f"   graph = {graph}")
+        print(f"   graph type = {type(graph)}")
+        print(f"   graph is None? {graph is None}")
+        if graph:
+            print(f"   hasattr(graph, 'get_fused_cache')? {hasattr(graph, 'get_fused_cache')}")
+            print(f"   graph class: {graph.__class__.__name__}")
+            print(f"   graph attributes: {[attr for attr in dir(graph) if not attr.startswith('_')][:10]}")
+        
         # Step 1: Get fused cache from predecessors (intermediate agents)
         past_kv = None
         has_cache = False
