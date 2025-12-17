@@ -154,3 +154,28 @@ class InspectorAgentCacheV2(DiverseAgentCacheV2):
     def __init__(self, id: str = None, domain: str = "", llm_name: str = "", **kwargs):
         super().__init__(id, "InspectorAgentCacheV2", domain, llm_name, 
                         role="Inspector", **kwargs)
+
+
+# Medical-specific agents for MedQA
+@AgentRegistry.register('MedicalExpertCacheV2')
+class MedicalExpertCacheV2(DiverseAgentCacheV2):
+    """Medical Expert Agent - Medical reasoning and diagnosis"""
+    def __init__(self, id: str = None, domain: str = "", llm_name: str = "", **kwargs):
+        super().__init__(id, "MedicalExpertCacheV2", domain, llm_name, 
+                        role="Medical Expert", **kwargs)
+
+
+@AgentRegistry.register('ClinicalAnalystCacheV2')
+class ClinicalAnalystCacheV2(DiverseAgentCacheV2):
+    """Clinical Analyst Agent - Clinical analysis and reasoning"""
+    def __init__(self, id: str = None, domain: str = "", llm_name: str = "", **kwargs):
+        super().__init__(id, "ClinicalAnalystCacheV2", domain, llm_name, 
+                        role="Clinical Analyst", **kwargs)
+
+
+@AgentRegistry.register('MedicalResearcherCacheV2')
+class MedicalResearcherCacheV2(DiverseAgentCacheV2):
+    """Medical Researcher Agent - Research-based medical reasoning"""
+    def __init__(self, id: str = None, domain: str = "", llm_name: str = "", **kwargs):
+        super().__init__(id, "MedicalResearcherCacheV2", domain, llm_name, 
+                        role="Medical Researcher", **kwargs)

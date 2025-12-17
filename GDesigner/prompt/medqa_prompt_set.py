@@ -35,6 +35,11 @@ ROLE_DESCRIPTION = {
         "Provide detailed medical reasoning. "
         "The last line of your output contains only the final answer as a letter, for example: The answer is C\n"
         "You will be given some examples you may refer to.",
+    "Programming Expert":
+        "You are a programming expert with medical knowledge. "
+        "You will be given a medical question and analysis from other agents. "
+        "You can use logical reasoning and computational thinking to analyze medical problems. "
+        "The last line of your output contains only the final answer as a letter, for example: The answer is C\n",
 }
 
 ROLE_CONNECTION = [
