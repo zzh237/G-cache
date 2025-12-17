@@ -122,9 +122,15 @@ async def main():
     
     # Setup agents
     if args.use_cache:
-        agent_names = ['MathSolverCacheV2'] * sum(args.agent_nums)
+        # Option 1: Diverse agents like LatentMAS (Math, Analyst, Code, Inspector)
+        agent_names = ['MathAgentCacheV2', 'AnalystAgentCacheV2', 'CodeAgentCacheV2', 'InspectorAgentCacheV2']
         decision_method = 'FinalReferCacheV2'  # Use cache-aware decision agent
-        print(f"✅ Using cache-enabled agents (including decision agent)")
+        print(f"✅ Using diverse cache-enabled agents: Math, Analyst, Code, Inspector")
+        
+        # Option 2: All same agents (uncomment to use)
+        # agent_names = ['MathSolverCacheV2'] * sum(args.agent_nums)
+        # decision_method = 'FinalReferCacheV2'
+        # print(f"✅ Using cache-enabled agents (all Math Solver)")
     else:
         agent_names = ['MathSolver'] * sum(args.agent_nums)
         decision_method = args.decision_method  # Use standard decision method

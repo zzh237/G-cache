@@ -1,6 +1,6 @@
 """
-CacheDesigner with API (uses your free Qwen API)
-Simulates cache for testing structure without GPU
+CacheDesigner with API for HumanEval (Code Generation)
+Tests graph-guided KV-cache on code generation tasks with execution
 """
 import sys
 import os
@@ -20,39 +20,36 @@ import time
 import asyncio
 from pathlib import Path
 import torch
-import copy
 from typing import List
 
 from GDesigner.utils.const import GDesigner_ROOT
 from GDesigner.graph.cache_graph import CacheGraph
 from GDesigner.tools.reader.readers import JSONLReader
-from GDesigner.utils.globals import Time, Cost, PromptTokens, CompletionTokens
-
-# Import from local gcache_data folder (not HuggingFace datasets)
-from gcache_data.gsm8k_dataset import gsm_data_process, gsm_get_predict
+from GDesigner.tools.coding.python_executor import PyExecutor
+from GDesigner.utils.globals import Time
+from GDesigner.utils.utils import extract_markdown_python_block, run_with_timeout
 from run_gsm8k import load_result, dataloader, get_kwargs
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="CacheDesigner (supports hybrid/API/local modes)")
-    # Use absolute path for dataset (relative to project root)
-    default_dataset = os.path.join(project_root, "gcache_data/gsm8k/gsm8k.jsonl")
+    parser = argparse.ArgumentParser(description="CacheDesigner for HumanEval")
+    default_dataset = os.path.join(project_root, "datasets/humaneval/humaneval-py.jsonl")
     parser.add_argument("--dataset_json", type=str, default=default_dataset)
     parser.add_argument("--llm_name", type=str, default="hybrid_cache_v2",
                         help="LLM mode: hybrid_cache_v2 (small GPU+API v2), qwen-plus (API only), local_cache (local only)")
     parser.add_argument('--mode', type=str, default='FullConnected')
     parser.add_argument('--lr', type=float, default=0.1)
-    parser.add_argument('--batch_size', type=int, default=1)  # Set to 1 for single data test
+    parser.add_argument('--batch_size', type=int, default=1)
     parser.add_argument('--num_rounds', type=int, default=1)
-    parser.add_argument('--num_iterations', type=int, default=10)  # Set to 1 for single batch test
-    parser.add_argument('--domain', type=str, default="gsm8k")
+    parser.add_argument('--num_iterations', type=int, default=10)
+    parser.add_argument('--domain', type=str, default="humaneval")
     parser.add_argument('--agent_nums', nargs='+', type=int, default=[4])
     parser.add_argument('--decision_method', type=str, default='FinalRefer')
     parser.add_argument('--optimized_spatial', type=bool, default=True, help='Enable spatial optimization (required for cache training)')
     
     # Cache arguments
     parser.add_argument('--use_cache', action='store_true', help='Enable cache')
-    parser.add_argument('--generation_mode', type=str, default='api_hint',  # Use api_hint to avoid local model collapse 
+    parser.add_argument('--generation_mode', type=str, default='api_hint',
                         choices=['api_hint', 'hybrid', 'local'],
                         help='Generation mode: api_hint (API with text hint), hybrid (local+API), local (local only)')
     parser.add_argument('--hidden_dim', type=int, default=4096)
@@ -69,7 +66,7 @@ async def main():
     args = parse_args()
     
     print("="*80)
-    print("🚀 CacheDesigner")
+    print("💻 CacheDesigner for HumanEval (Code Generation)")
     print("="*80)
     print(f"Mode: {args.llm_name}")
     print(f"Cache enabled: {args.use_cache}")
@@ -84,14 +81,14 @@ async def main():
     print("="*80)
     
     # Load dataset
+    print("📥 Loading HumanEval dataset...")
     dataset = JSONLReader.parse_file(args.dataset_json)
-    dataset = gsm_data_process(dataset)
+    print(f"✅ Loaded {len(dataset)} HumanEval problems")
     
     current_time = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
     Time.instance().value = current_time
     
-    # Setup directories (same structure as results)
-    result_dir = Path(f"{GDesigner_ROOT}/result/{args.domain}")
+    result_dir = Path(f"{GDesigner_ROOT}/result/humaneval")
     result_dir.mkdir(parents=True, exist_ok=True)
     result_file = result_dir / f"cache_API_{args.domain}_{current_time}.json"
     
@@ -122,8 +119,8 @@ async def main():
         # decision_method = 'FinalReferCacheV2'
         # print(f"✅ Using cache-enabled agents (all Math Solver)")
     else:
-        agent_names = ['MathSolver'] * sum(args.agent_nums)
-        decision_method = args.decision_method  # Use standard decision method
+        agent_names = ['CodeWriting'] * sum(args.agent_nums)
+        decision_method = args.decision_method
         print(f"📝 Using text-only agents (baseline)")
     
     kwargs = get_kwargs(args.mode, len(agent_names))
@@ -141,14 +138,14 @@ async def main():
         node_kwargs = []
         for i, _ in enumerate(agent_names):
             is_final = (i == len(agent_names) - 1)  # Last agent before FinalRefer
-            max_tokens = 2048 if is_final else 512  # Final: 2048, Intermediate: 512
+            max_tokens = 2048 if is_final else 1024  # Final: 2048, Intermediate: 1024 (Code needs more)
             node_kwargs.append({
                 "generation_mode": args.generation_mode,
                 "max_new_tokens": max_tokens,
                 "latent_only": args.latent_only,
                 "latent_steps": args.latent_steps
             })
-        print(f"📏 Token limits: Intermediate agents=512, Final agent=2048")
+        print(f"📏 Token limits: Intermediate agents=1024, Final agent=2048")
         if args.latent_only:
             print(f"✂️  Latent-only mode: Keep only {args.latent_steps} latent tokens per agent")
         
@@ -166,7 +163,7 @@ async def main():
     
     # Create CacheGraph
     graph = CacheGraph(
-        domain="gsm8k",
+        domain="humaneval",
         llm_name=args.llm_name,
         agent_names=agent_names,
         decision_method=decision_method,
@@ -218,18 +215,17 @@ async def main():
         
         # Process batch
         answer_log_probs = []
-        answers = []
+        tests = []
         
         print(f"\n📦 [STEP 0] Loading batch tasks and preparing for execution...")
         for idx, record in enumerate(current_batch):
-            task = record["task"]
-            answer = record["answer"]
-            answers.append(answer)
+            task = record["prompt"]
+            test = record["test"]
+            tests.append(test)
             input_dict = {"task": task}
             global_idx = i_batch * args.batch_size + idx
-            print(f"\n📝 [STEP 0.{idx+1}] Question ID: {global_idx}")
+            print(f"\n📝 [STEP 0.{idx+1}] Problem ID: {global_idx}")
             print(f"   Task {idx+1}/{len(current_batch)}: {task[:100]}...")
-            print(f"   🎯 Expected answer: {answer}")
             # Reuse same graph for all tasks (models can't be deepcopied)
             answer_log_probs.append(asyncio.create_task(graph.arun(input_dict, args.num_rounds)))
         
@@ -243,16 +239,29 @@ async def main():
         utilities = []
         data = load_result(result_file)
         
-        print(f"\n📊 [STEP 13.5] Log probabilities info:")
-        print(f"   📏 Number of log_probs: {len(log_probs)} (should equal batch_size={args.batch_size})")
-        print(f"   📏 Number of tasks in this batch: {len(current_batch)}")
-        
-        print(f"\n📊 [STEP 14] Processing results and computing metrics...")
-        for idx, (task, answer, log_prob, true_answer) in enumerate(zip(current_batch, raw_answers, log_probs, answers)):
-            print(f"\n🔍 [DEBUG] Extracting answer from Task {idx+1} response {str(answer[0])}...")
-            predict_answer = gsm_get_predict(answer[0])
-            print(f"   Extracted: '{predict_answer}', Expected: '{true_answer}'")
-            is_solved = float(predict_answer) == float(true_answer)
+        print(f"\n📊 [STEP 14] Processing results and executing code...")
+        for idx, (task, answer, log_prob, test) in enumerate(zip(current_batch, raw_answers, log_probs, tests)):
+            print(f"\n🔍 [DEBUG] Extracting code from Task {idx+1} response...")
+            
+            # Extract code from response
+            answer_text = answer[0]
+            code = extract_markdown_python_block(answer_text)
+            
+            if code is None:
+                # Fallback: try to extract code without markdown
+                code = answer_text.lstrip("```python\n").rstrip("\n```")
+            
+            print(f"   📝 Extracted code ({len(code)} chars)")
+            print(f"   Code preview: {code[:200]}...")
+            
+            # Execute code with test
+            print(f"   🔧 Executing code with test case...")
+            try:
+                is_solved, _, error_msg = PyExecutor().execute(code, [test], timeout=100)
+            except Exception as e:
+                is_solved = False
+                error_msg = str(e)
+            
             total_solved += is_solved
             total_executed += 1
             accuracy = total_solved / total_executed
@@ -263,15 +272,16 @@ async def main():
             loss_list.append(single_loss)
             
             global_idx = i_batch * args.batch_size + idx
-            print(f"   🔢 Question ID {global_idx}: Predicted={predict_answer}, Expected={true_answer}, Solved={is_solved}")
+            print(f"   🔢 Problem ID {global_idx}: Solved={is_solved}, Error={error_msg}")
             
             data.append({
-                "Question_ID": global_idx,
-                "Question": task["task"],
-                "Answer": true_answer,
+                "Problem_ID": global_idx,
+                "Question": task["prompt"],
+                "Test": test,
                 "Response": answer,
-                "Attempt answer": predict_answer,
+                "Extracted_Code": code,
                 "Solved": is_solved,
+                "Error": error_msg,
                 "Accuracy": accuracy,
                 "Use Cache": args.use_cache,
                 "Cache Method": args.llm_name if args.use_cache else "None"
@@ -282,27 +292,17 @@ async def main():
         
         # Backprop
         if loss_list:
-            print(f"\n🔄 [STEP 15] Backpropagation:")
-            print(f"   📏 loss_list dimensions: {len(loss_list)} losses (one per task in batch)")
-            print(f"   📊 Batch contains {len(current_batch)} tasks/questions")
-            
             total_loss = torch.mean(torch.stack(loss_list))
             if args.use_cache and total_loss.requires_grad:
                 try:
                     optimizer.zero_grad()
                     total_loss.backward()
-                    # Clip gradients to prevent NaN/Inf
                     torch.nn.utils.clip_grad_norm_(params, max_norm=1.0)
                     optimizer.step()
-                    print(f"   ✅ Optimizer step completed for batch/update {i_batch}")
                 except RuntimeError as e:
                     print(f"   ⚠️ Backprop error: {e}")
-                    print(f"   ⚠️ Skipping optimization step for batch/update {i_batch}")
-            else:
-                print(f"   ⏭️ Skipping backprop (use_cache={args.use_cache}, requires_grad={total_loss.requires_grad})")
         else:
             total_loss = torch.tensor(0.0)
-            print(f"\n⚠️ [STEP 15] No losses to backpropagate")
         
         print(f"\n📊 [BATCH/UPDATE {i_batch}] Summary:")
         print(f"   ⏱️  Batch time: {time.time() - start_ts:.3f}s")

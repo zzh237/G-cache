@@ -10,7 +10,81 @@ Combines **GDesigner's** graph topology with **LatentMAS's** KV-cache generation
 cd experiments
 
 # Hybrid mode (RECOMMENDED) - small GPU + free API
-python run_gsm8k_cache_API.py --llm_name hybrid_cache --use_cache
+python run_gsm8k_cache_API.py --llm_name hybrid_cache_v2 --use_cache --generation_mode hybrid --latent_only
+```
+
+---
+
+## 📋 Run Scripts for All Tasks
+
+### Math Reasoning Tasks
+
+**GSM8K (Grade School Math)**
+```bash
+cd experiments
+python run_gsm8k_cache_API.py --llm_name hybrid_cache_v2 --use_cache --generation_mode hybrid --latent_only --latent_steps 10
+```
+
+### Science & Medical Tasks
+
+**GPQA (Graduate-Level Science)**
+```bash
+cd experiments
+python run_gpqa_cache_API.py --llm_name hybrid_cache_v2 --use_cache --generation_mode hybrid --latent_only --latent_steps 10
+```
+
+**MedQA (Medical Q&A)**
+```bash
+cd experiments
+python run_medqa_cache_API.py --llm_name hybrid_cache_v2 --use_cache --generation_mode hybrid --latent_only --latent_steps 10
+```
+
+### Code Generation Tasks
+
+**HumanEval (Function-Level Code)**
+```bash
+cd experiments
+python run_humaneval_cache_API.py --llm_name hybrid_cache_v2 --use_cache --generation_mode hybrid --latent_only --latent_steps 10
+```
+
+**MBPP+ (Basic Python Problems)**
+```bash
+cd experiments
+python run_mbppplus_cache_API.py --llm_name hybrid_cache_v2 --use_cache --generation_mode hybrid --latent_only --latent_steps 10
+```
+
+### Common Options
+
+```bash
+# Run specific question
+--question_id 0  # Run only question 0
+
+# Adjust batch size
+--batch_size 1  # Process 1 question at a time
+
+# Number of iterations
+--num_iterations 10  # Run 10 batches
+
+# Latent steps (reasoning depth)
+--latent_steps 10  # 10 latent reasoning steps per agent
+
+# Generation modes
+--generation_mode hybrid     # Local model + API (BEST quality)
+--generation_mode api_hint   # API only with cache hint
+--generation_mode local      # Local model only (no API)
+
+# Agent configuration
+--agent_nums 4  # Use 4 agents
+```
+
+### Agent Types
+
+By default, all scripts use **diverse agents** (Math, Analyst, Code, Inspector).
+
+To switch to **uniform agents** (all Math Solver), edit the script and uncomment:
+```python
+# Option 2: All same agents (uncomment to use)
+agent_names = ['MathSolverCacheV2'] * sum(args.agent_nums)
 ```
 
 ---
