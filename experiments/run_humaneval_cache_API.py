@@ -33,7 +33,7 @@ from run_gsm8k import load_result, dataloader, get_kwargs
 
 def parse_args():
     parser = argparse.ArgumentParser(description="CacheDesigner for HumanEval")
-    default_dataset = os.path.join(project_root, "datasets/humaneval/humaneval-py.jsonl")
+    default_dataset = os.path.join(project_root, "gcache_data/humaneval/humaneval-py.jsonl")
     parser.add_argument("--dataset_json", type=str, default=default_dataset)
     parser.add_argument("--llm_name", type=str, default="hybrid_cache_v2",
                         help="LLM mode: hybrid_cache_v2 (small GPU+API v2), qwen-plus (API only), local_cache (local only)")
