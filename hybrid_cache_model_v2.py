@@ -115,8 +115,8 @@ class HybridCacheModel:
         Generate KV-cache using SMALL local model
         EXACT implementation from LatentMAS models.py:313-382
         """
-        print(f"\n   🧠 [STEP 8a] HybridCacheModel.generate_latent_batch() - Generating cache using small local model")
-        print(f"   📊 [LOCAL-MODEL] Input: {input_ids.shape[1]} tokens, Latent steps: {latent_steps}")
+        print(f"\n   🧠 [LATENT_CACHE:STEP 8a] HybridCacheModel.generate_latent_batch() - Generating cache using small local model")
+        print(f"   📊 [LATENT_CACHE:LOCAL-MODEL] Input: {input_ids.shape[1]} tokens, Latent steps: {latent_steps}")
         
         if attention_mask is None:
             attention_mask = torch.ones_like(input_ids, device=self.device)
@@ -133,7 +133,7 @@ class HybridCacheModel:
             past_key_values = dynamic_cache
         
         # Handle past_key_values attention mask (LatentMAS lines 320-329)
-        print(f"\n   📐 [STEP 8a][DIMENSIONS] BEFORE Step 1 - Initial forward pass:")
+        print(f"\n   📐 [LATENT_CACHE:STEP 8a][DIMENSIONS] BEFORE Step 1 - Initial forward pass:")
         print(f"      • input_ids: {input_ids.shape}")
         print(f"      • attention_mask (before concat): {attention_mask.shape}")
         if past_key_values is not None:
@@ -167,7 +167,7 @@ class HybridCacheModel:
         past = outputs.past_key_values
         last_hidden = outputs.hidden_states[-1][:, -1, :]  # [B, D]
         
-        print(f"\n   📐 [STEP 8a][DIMENSIONS] AFTER Step 1 - Initial forward pass:")
+        print(f"\n   📐 [LATENT_CACHE:STEP 8a][DIMENSIONS] AFTER Step 1 - Initial forward pass:")
         print(f"      • OUTPUT past_key_values, lengh increased: {len(past)} layers, seq_len={past[0][0].shape[2]}")
         print(f"        - Layer 0 Key: {past[0][0].shape}")
         print(f"        - Layer 0 Value: {past[0][1].shape}")
@@ -178,9 +178,10 @@ class HybridCacheModel:
             print(f"      • Cache grew by: {output_past_len - input_past_len} tokens (added {input_ids.shape[1]} input tokens)")
         
         # Step 2: Latent reasoning loop (LatentMAS lines 348-378)
-        print(f"\n   🔄 [STEP 8a][STEP 2] Starting latent reasoning loop ({latent_steps} steps)...")
+        print(f"\n   🔄 [LATENT_CACHE:STEP 8a][STEP 2] Starting latent reasoning loop ({latent_steps} steps)...")
         for step in range(latent_steps):
-            print(f"      •cashe_model: OUTPUT past_key_values: {len(past)} layers, seq_len={past[0][0].shape[2]}")
+            print(f"      • LATENT_CACHE: STEP {step+1}/{latent_steps}")
+            print(f"      • past_key_values (PAST): {len(past)} layers, seq_len={past[0][0].shape[2]}")
             print(f"        - Layer 0 Key: {past[0][0].shape}")
             print(f"        - Layer 0 Value: {past[0][1].shape}")
             past_len_before = past[0][0].shape[2]
@@ -190,7 +191,7 @@ class HybridCacheModel:
             latent_vec = self._apply_alignment(last_hidden)
             print(f"      • latent_vec: {latent_vec.shape}")
             latent_embed = latent_vec.unsqueeze(1)  # [B, 1, D]
-            print(f"      •cashe_model: latent_embed: {latent_embed.shape}")
+            print(f"      • latent_embed (INPUTS): {latent_embed.shape}")
             
             # Calculate past length (LatentMAS lines 361-362)
             past_len = past[0][0].shape[-2] if past else 0
@@ -200,7 +201,7 @@ class HybridCacheModel:
                 dtype=torch.long,
                 device=self.device,
             )
-            print(f"      •cashe_model: latent_mask: {latent_mask.shape}")
+            print(f"      • latent_mask (ATTENTION_MASK): {latent_mask.shape}")
 
             # Forward pass with embedding (LatentMAS lines 363-370)
             outputs = self.cache_model(
@@ -213,6 +214,9 @@ class HybridCacheModel:
             )
             print(f"      •cashe_model: outputs.hidden_states: {len(outputs.hidden_states)} layers, last layer shape: {outputs.hidden_states[-1].shape}")
             past = outputs.past_key_values
+            output_seq_len = outputs.sequences.shape[1]
+            print(f"      • sequences: {outputs.sequences.shape} (batch_size={outputs.sequences.shape[0]}, total_seq_len={output_seq_len})")
+            
             last_hidden = outputs.hidden_states[-1][:, -1, :]
             
             past_len_after = past[0][0].shape[2]
