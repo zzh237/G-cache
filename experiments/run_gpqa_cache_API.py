@@ -120,15 +120,15 @@ async def main():
     
     # Setup agents
     if args.use_cache:
-        # Option 1: Use uniform agents (recommended for GPQA science questions)
-        agent_names = ['MathSolverCacheV2'] * sum(args.agent_nums)
+        # Option 1: Diverse science agents (recommended for GPQA)
+        agent_names = ['ScienceExpertCacheV2', 'ScientificAnalystCacheV2', 'CodeAgentCacheV2', 'ResearcherCacheV2']
         decision_method = 'FinalReferCacheV2'
-        print(f"✅ Using cache-enabled agents (Science Expert)")
+        print(f"✅ Using diverse cache-enabled agents: Science Expert, Scientific Analyst, Code, Researcher")
         
-        # Option 2: Diverse agents (uncomment to use - experimental)
-        # agent_names = ['MathAgentCacheV2', 'AnalystAgentCacheV2', 'CodeAgentCacheV2', 'InspectorAgentCacheV2']
+        # Option 2: Uniform agents (uncomment to use)
+        # agent_names = ['MathSolverCacheV2'] * sum(args.agent_nums)
         # decision_method = 'FinalReferCacheV2'
-        # print(f"✅ Using diverse cache-enabled agents: Math, Analyst, Code, Inspector")
+        # print(f"✅ Using cache-enabled agents (all Science Expert)")
     else:
         agent_names = ['MathSolver'] * sum(args.agent_nums)
         decision_method = args.decision_method  # Use standard decision method

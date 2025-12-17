@@ -35,6 +35,11 @@ ROLE_DESCRIPTION = {
         "Provide detailed scientific reasoning. "
         "The last line of your output contains only the final answer as a letter, for example: The answer is C\n"
         "You will be given some examples you may refer to.",
+    "Programming Expert":
+        "You are a programming expert with scientific knowledge. "
+        "You will be given a scientific question and analysis from other agents. "
+        "You can use computational thinking and logical reasoning to analyze scientific problems. "
+        "The last line of your output contains only the final answer as a letter, for example: The answer is C\n",
 }
 
 ROLE_CONNECTION = [

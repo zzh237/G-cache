@@ -179,3 +179,28 @@ class MedicalResearcherCacheV2(DiverseAgentCacheV2):
     def __init__(self, id: str = None, domain: str = "", llm_name: str = "", **kwargs):
         super().__init__(id, "MedicalResearcherCacheV2", domain, llm_name, 
                         role="Medical Researcher", **kwargs)
+
+
+# Science-specific agents for GPQA
+@AgentRegistry.register('ScienceExpertCacheV2')
+class ScienceExpertCacheV2(DiverseAgentCacheV2):
+    """Science Expert Agent - Scientific reasoning and analysis"""
+    def __init__(self, id: str = None, domain: str = "", llm_name: str = "", **kwargs):
+        super().__init__(id, "ScienceExpertCacheV2", domain, llm_name, 
+                        role="Science Expert", **kwargs)
+
+
+@AgentRegistry.register('ScientificAnalystCacheV2')
+class ScientificAnalystCacheV2(DiverseAgentCacheV2):
+    """Scientific Analyst Agent - Systematic scientific analysis"""
+    def __init__(self, id: str = None, domain: str = "", llm_name: str = "", **kwargs):
+        super().__init__(id, "ScientificAnalystCacheV2", domain, llm_name, 
+                        role="Scientific Analyst", **kwargs)
+
+
+@AgentRegistry.register('ResearcherCacheV2')
+class ResearcherCacheV2(DiverseAgentCacheV2):
+    """Researcher Agent - Research-based scientific reasoning"""
+    def __init__(self, id: str = None, domain: str = "", llm_name: str = "", **kwargs):
+        super().__init__(id, "ResearcherCacheV2", domain, llm_name, 
+                        role="Researcher", **kwargs)
