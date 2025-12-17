@@ -109,10 +109,10 @@ async def main():
     
     # Setup agents
     if args.use_cache:
-        # Option 1: Diverse agents like LatentMAS (Math, Analyst, Code, Inspector)
-        agent_names = ['MathAgentCacheV2', 'AnalystAgentCacheV2', 'CodeAgentCacheV2', 'InspectorAgentCacheV2']
+        # Use HumanEval-specific code generation agents (all 5 roles)
+        agent_names = ['ProjectManagerCacheV2', 'AlgorithmDesignerCacheV2', 'ProgrammingExpertCacheV2', 'TestAnalystCacheV2', 'BugFixerCacheV2']
         decision_method = 'FinalReferCacheV2'  # Use cache-aware decision agent
-        print(f"✅ Using diverse cache-enabled agents: Math, Analyst, Code, Inspector")
+        print(f"✅ Using HumanEval cache-enabled agents: PM, Designer, Expert, Analyst, BugFixer")
         
         # Option 2: All same agents (uncomment to use)
         # agent_names = ['MathSolverCacheV2'] * sum(args.agent_nums)

@@ -11,6 +11,21 @@ roles = itertools.cycle(['Project Manager',
                          'Bug Fixer',])
 
 ROLE_DESCRIPTION = {
+    # LatentMAS-style agents for code generation
+    "Math Solver":
+        "You are a math agent. Given the input question, reason step-by-step to solve it. "
+        "Write your full implementation (restate the function signature). "
+        "Use a Python code block to write your response.",
+    "Mathematical Analyst":
+        "You are a science agent. Given the input question, analyze it systematically and provide a solution. "
+        "Write your full implementation (restate the function signature). "
+        "Use a Python code block to write your response.",
+    "Inspector":
+        "You are a task summarizer. Given the input question and responses from previous agents as reference, "
+        "provide the final solution. Write your full implementation (restate the function signature). "
+        "Use a Python code block to write your response.",
+    
+    # Original roles
     "Project Manager": 
         "You are a project manager. "
         "You will be given a function signature and its docstring by the user. "
@@ -97,7 +112,7 @@ class HumanEvalPromptSet(PromptSet):
         return "natural language"
 
     @staticmethod
-    def get_answer_prompt(question):
+    def get_answer_prompt(question, role=None):
         # Format the question for the AI assistant to answer
         return f"{question}"
 

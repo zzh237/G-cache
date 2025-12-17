@@ -156,6 +156,47 @@ class InspectorAgentCacheV2(DiverseAgentCacheV2):
                         role="Inspector", **kwargs)
 
 
+# HumanEval-specific code generation agents
+@AgentRegistry.register('ProjectManagerCacheV2')
+class ProjectManagerCacheV2(DiverseAgentCacheV2):
+    """Project Manager Agent - Oversees code structure and design"""
+    def __init__(self, id: str = None, domain: str = "", llm_name: str = "", **kwargs):
+        super().__init__(id, "ProjectManagerCacheV2", domain, llm_name, 
+                        role="Project Manager", **kwargs)
+
+
+@AgentRegistry.register('AlgorithmDesignerCacheV2')
+class AlgorithmDesignerCacheV2(DiverseAgentCacheV2):
+    """Algorithm Designer Agent - Designs algorithm structure"""
+    def __init__(self, id: str = None, domain: str = "", llm_name: str = "", **kwargs):
+        super().__init__(id, "AlgorithmDesignerCacheV2", domain, llm_name, 
+                        role="Algorithm Designer", **kwargs)
+
+
+@AgentRegistry.register('ProgrammingExpertCacheV2')
+class ProgrammingExpertCacheV2(DiverseAgentCacheV2):
+    """Programming Expert Agent - Implements the code"""
+    def __init__(self, id: str = None, domain: str = "", llm_name: str = "", **kwargs):
+        super().__init__(id, "ProgrammingExpertCacheV2", domain, llm_name, 
+                        role="Programming Expert", **kwargs)
+
+
+@AgentRegistry.register('TestAnalystCacheV2')
+class TestAnalystCacheV2(DiverseAgentCacheV2):
+    """Test Analyst Agent - Analyzes test cases and edge cases"""
+    def __init__(self, id: str = None, domain: str = "", llm_name: str = "", **kwargs):
+        super().__init__(id, "TestAnalystCacheV2", domain, llm_name, 
+                        role="Test Analyst", **kwargs)
+
+
+@AgentRegistry.register('BugFixerCacheV2')
+class BugFixerCacheV2(DiverseAgentCacheV2):
+    """Bug Fixer Agent - Fixes bugs in code"""
+    def __init__(self, id: str = None, domain: str = "", llm_name: str = "", **kwargs):
+        super().__init__(id, "BugFixerCacheV2", domain, llm_name, 
+                        role="Bug Fixer", **kwargs)
+
+
 # Medical-specific agents for MedQA
 @AgentRegistry.register('MedicalExpertCacheV2')
 class MedicalExpertCacheV2(DiverseAgentCacheV2):
