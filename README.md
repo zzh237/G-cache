@@ -963,3 +963,189 @@ The cache itself (KV-cache tensors) is generated in **STEP 8a** and contains the
 | 14 | Metrics | Accuracy computation |
 
 **Your output appears at STEP 13** - it's the final aggregated response after all agents complete their processing.
+
+
+我来详细解释Transformer模型中的forward pass和generation过程，包括所有维度信息。
+
+1. Hidden State H(l) 的计算过程
+H(l) ∈ R^(1×690×2560) 是这样得到的：
+
+完整的Transformer Layer计算：
+
+输入: H(l-1) ∈ R^(B×T×D)  (B=1, T=690, D=2560)
+
+步骤1: Self-Attention
+------
+Q = H(l-1) @ W_Q  →  Q ∈ R^(1×690×2560)
+K = H(l-1) @ W_K  →  K ∈ R^(1×690×2560)  
+V = H(l-1) @ W_V  →  V ∈ R^(1×690×2560)
+
+步骤2: Multi-Head Attention (假设32个heads)
+------
+将Q,K,V分成32个heads:
+Q_heads ∈ R^(1×32×690×80)  (2560/32=80)
+K_heads ∈ R^(1×32×690×80)
+V_heads ∈ R^(1×32×690×80)
+
+步骤3: Scaled Dot-Product Attention
+------
+scores = (Q_heads @ K_heads^T) / sqrt(80)  →  scores ∈ R^(1×32×690×690)
+
+步骤4: Apply Attention Mask (这里回答你的mask问题)
+------
+# attention_mask ∈ R^(1×690), 值为0或1
+# 扩展为 R^(1×1×690×690) 的causal mask
+mask = (1 - attention_mask) * (-10000)  # 0变0, 1变-10000
+scores = scores + mask  # Element-wise加法!
+
+步骤5: Softmax (在sequence维度上)
+------
+attn_weights = softmax(scores, dim=-1)  # 在最后一维(690)上做softmax
+# attn_weights ∈ R^(1×32×690×690)
+
+步骤6: Apply to Values
+------
+attn_output = attn_weights @ V_heads  →  R^(1×32×690×80)
+
+步骤7: Concat heads
+------
+attn_output = concat(attn_output)  →  R^(1×690×2560)
+
+步骤8: Output projection
+------
+O = attn_output @ W_O  →  O ∈ R^(1×690×2560)
+
+步骤9: Add & Norm
+------
+H_attn = LayerNorm(H(l-1) + O)  →  R^(1×690×2560)
+
+步骤10: FFN
+------
+H(l) = LayerNorm(H_attn + FFN(H_attn))  →  R^(1×690×2560)
+
+
+Copy
+所以是的，需要QKV！ 每一层都要计算QKV。
+
+2. Attention Mask 的作用机制
+# attention_mask 示例: [1, 1, 1, 0, 0]  (前3个token有效，后2个padding)
+
+# 步骤1: 转换为additive mask
+mask = (1 - attention_mask) * (-10000)
+# 结果: [0, 0, 0, -10000, -10000]
+
+# 步骤2: 扩展到attention scores维度
+# scores ∈ R^(B×heads×T×T)
+# mask扩展为 R^(B×1×1×T) 然后broadcast
+
+# 步骤3: Element-wise 加法 (不是乘法!)
+scores = scores + mask
+# 例如某个位置的score是5.2，如果mask是-10000，则变成-9994.8
+
+# 步骤4: Softmax
+attn_weights = softmax(scores, dim=-1)
+# exp(-10000) ≈ 0，所以被mask的位置权重≈0
+
+关键点：
+
+Mask是 加法 ，不是乘法
+
+Softmax是在 sequence level （最后一维）上做的
+
+被mask的位置经过softmax后权重≈0，相当于"knock out"
+
+3. Generation过程详解
+Prefill阶段（第一次forward）
+
+输入: input_ids ∈ R^(1×T)  例如 T=10
+past_kv = None
+
+步骤1: Embedding
+------
+H(0) = Embedding(input_ids)  →  H(0) ∈ R^(1×10×2560)
+
+步骤2: 通过所有Transformer layers
+------
+for layer in layers:
+    H(l) = TransformerLayer(H(l-1))  # 如上面详细过程
+    # 同时生成并保存 K(l), V(l) ∈ R^(1×32×10×80)
+
+最终: H(L) ∈ R^(1×10×2560)  (L是最后一层)
+
+步骤3: 取最后一个token的hidden state
+------
+h_last = H(L)[:, -1, :]  →  h_last ∈ R^(1×2560)
+
+步骤4: 生成logits
+------
+logits = h_last @ W_lm_head  →  logits ∈ R^(1×vocab_size)
+
+步骤5: 采样next token
+------
+next_token_id = sample(logits)  →  scalar
+
+步骤6: 保存KV cache
+------
+past_kv = [(K(1), V(1)), (K(2), V(2)), ..., (K(L), V(L))]
+# 每个 K(l), V(l) ∈ R^(1×32×10×80)
+
+Autoregressive阶段（后续生成）
+
+输入: next_token_id (scalar)
+past_kv = [(K, V) for each layer]  # K,V ∈ R^(1×32×T_past×80)
+
+步骤1: Embedding
+------
+h_new = Embedding(next_token_id)  →  h_new ∈ R^(1×1×2560)
+
+步骤2: 通过所有layers (使用KV cache!)
+------
+for layer_idx, layer in enumerate(layers):
+    K_past, V_past = past_kv[layer_idx]  # R^(1×32×T_past×80)
+    
+    # 只计算新token的Q,K,V
+    Q_new = h_new @ W_Q  →  R^(1×32×1×80)
+    K_new = h_new @ W_K  →  R^(1×32×1×80)
+    V_new = h_new @ W_V  →  R^(1×32×1×80)
+    
+    # Concat with past
+    K_full = concat([K_past, K_new], dim=2)  →  R^(1×32×(T_past+1)×80)
+    V_full = concat([V_past, V_new], dim=2)  →  R^(1×32×(T_past+1)×80)
+    
+    # Attention (Q只有1个token，但attend to所有past tokens)
+    scores = Q_new @ K_full^T  →  R^(1×32×1×(T_past+1))
+    attn = softmax(scores, dim=-1)
+    output = attn @ V_full  →  R^(1×32×1×80)
+    
+    # 继续FFN等...
+    h_new = TransformerLayer(h_new, K_full, V_full)  →  R^(1×1×2560)
+    
+    # 更新cache
+    past_kv[layer_idx] = (K_full, V_full)
+
+步骤3: 生成下一个token
+------
+h_last = h_new[:, -1, :]  →  R^(1×2560)
+logits = h_last @ W_lm_head  →  R^(1×vocab_size)
+next_token = sample(logits)
+
+4. 关于你的代码中的latent generation
+在你的代码中：
+
+# generate_latent_batch() - 只生成cache，不生成token
+outputs = self.cache_model(
+    inputs_embeds=latent_embed,  # R^(1×1×2560)
+    past_key_values=past,
+    use_cache=True,
+    output_hidden_states=True,
+    return_dict=True,
+)
+# 注意: 这里没有调用 .generate()
+# 所以没有 outputs.sequences 属性!
+# 只有 outputs.hidden_states 和 outputs.past_key_values
+
+你的错误原因：
+
+output_seq_len = outputs.sequences.shape[1]  # ❌ 错误!
+# CausalLMOutputWithPast 没有 sequences 属性
+# sequences 只在 .generate() 的返回值中存在
