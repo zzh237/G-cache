@@ -214,8 +214,8 @@ class HybridCacheModel:
             )
             print(f"      •cashe_model: outputs.hidden_states: {len(outputs.hidden_states)} layers, last layer shape: {outputs.hidden_states[-1].shape}")
             past = outputs.past_key_values
-            output_seq_len = outputs.sequences.shape[1]
-            print(f"      • sequences: {outputs.sequences.shape} (batch_size={outputs.sequences.shape[0]}, total_seq_len={output_seq_len})")
+            # output_seq_len = outputs.sequences.shape[1]
+            # print(f"      • sequences: {outputs.sequences.shape} (batch_size={outputs.sequences.shape[0]}, total_seq_len={output_seq_len})")
             
             last_hidden = outputs.hidden_states[-1][:, -1, :]
             
