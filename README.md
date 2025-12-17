@@ -1223,3 +1223,110 @@ outputs = self.cache_model(
 output_seq_len = outputs.sequences.shape[1]  # ❌ 错误!
 # CausalLMOutputWithPast 没有 sequences 属性
 # sequences 只在 .generate() 的返回值中存在
+
+
+
+好问题！让我解释一下它们的关系：
+
+MathAgentCacheV2 vs MathSolverCacheV2
+1. 继承关系
+MathAgentCacheV2 继承自 DiverseAgentCacheV2 （基类），而不是 MathSolverCacheV2：
+
+# diverse_agents_cache_v2.py
+class DiverseAgentCacheV2(Node):  # ← 基类
+    """Base class for diverse cache-enabled agents"""
+    # ... 所有核心逻辑在这里 ...
+
+class MathAgentCacheV2(DiverseAgentCacheV2):  # ← 继承基类
+    """Math Solver Agent"""
+    def __init__(self, id: str = None, domain: str = "", llm_name: str = "", **kwargs):
+        super().__init__(id, "MathAgentCacheV2", domain, llm_name, 
+                        role="Math Solver", **kwargs)  # ← 只设置role
+
+Copy
+python
+2. 代码复用
+MathAgentCacheV2 和 MathSolverCacheV2 的 _async_execute 逻辑完全相同！
+
+我把 MathSolverCacheV2 的核心逻辑复制到了 DiverseAgentCacheV2 基类中：
+
+# DiverseAgentCacheV2 (基类) 包含完整的 _async_execute 逻辑
+async def _async_execute(self, input, spatial_info, temporal_info):
+    # Step 1: Get fused cache
+    past_kv = graph.get_fused_cache(self)
+    
+    # Step 2: Build prompt
+    system_prompt, user_prompt = self._process_inputs(...)
+    
+    # Step 3: Generate with cache
+    response, kv_cache = await self.llm.agen_with_cache(...)
+    
+    # Step 4: Truncate cache if latent_only
+    if self.latent_only:
+        kv_cache = self._truncate_past(kv_cache, self.latent_steps)
+    
+    # Step 5: Store cache
+    graph.store_node_cache(self.id, kv_cache)
+    
+    # Step 6: Return response
+    return response if self.agent_type != "intermediate" else ""
+
+Copy
+python
+3. 唯一的区别：Role
+Agent	继承自	Role	Prompt
+MathSolverCacheV2	Node	"Math Solver" (默认)	数学专家
+MathAgentCacheV2	DiverseAgentCacheV2	"Math Solver"	数学专家
+AnalystAgentCacheV2	DiverseAgentCacheV2	"Mathematical Analyst"	数学分析师
+CodeAgentCacheV2	DiverseAgentCacheV2	"Programming Expert"	编程专家
+InspectorAgentCacheV2	DiverseAgentCacheV2	"Inspector"	检查员
+4. 依赖关系
+没有依赖关系！ 它们是平行的：
+
+Node (基类)
+├── MathSolverCacheV2 (独立实现)
+└── DiverseAgentCacheV2 (基类)
+    ├── MathAgentCacheV2
+    ├── AnalystAgentCacheV2
+    ├── CodeAgentCacheV2
+    └── InspectorAgentCacheV2
+
+Copy
+5. 为什么要创建新的？
+原因：代码复用 + 多样化
+
+MathSolverCacheV2 : 单一用途，所有agents都是Math Solver
+
+DiverseAgentCacheV2 : 可复用基类，支持4种不同角色
+
+好处：
+
+避免代码重复（4个agents共享同一个 _async_execute）
+
+易于维护（修改一次，4个agents都更新）
+
+支持多样化（每个agent有不同的role和prompt）
+
+6. 实际执行流程相同
+无论是 MathSolverCacheV2 还是 MathAgentCacheV2，执行流程完全一样：
+
+# 两者都执行相同的步骤：
+1. Get fused cache from predecessors
+2. Build prompt (唯一区别：role不同，prompt不同)
+3. Generate with cache
+4. Truncate cache if latent_only
+5. Store cache for successors
+6. Return response
+
+Copy
+python
+总结
+没有依赖关系 - MathAgentCacheV2 不依赖 MathSolverCacheV2
+
+代码逻辑相同 - 我把 MathSolverCacheV2 的逻辑复制到了 DiverseAgentCacheV2
+
+唯一区别 - Role 和 Prompt 不同
+
+优势 - 代码复用 + 支持多样化agents
+
+你可以把 MathAgentCacheV2 看作是 MathSolverCacheV2 的"多样化版本"，它们功能相同，但支持不同的角色！

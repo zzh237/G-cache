@@ -87,6 +87,8 @@ class DiverseAgentCacheV2(Node):
         
         # Generate with cache
         if hasattr(self.llm, 'agen_with_cache'):
+            print(f"\n🧠 [STEP 6] Calling llm.agen_with_cache() - Agent type: {self.agent_type}")
+            
             print(f"   🧠 Generating with {self.role} perspective...")
             
             response, kv_cache = await self.llm.agen_with_cache(
@@ -109,6 +111,7 @@ class DiverseAgentCacheV2(Node):
             # Store cache
             if graph and hasattr(graph, 'store_node_cache'):
                 graph.store_node_cache(self.id, kv_cache)
+                print(f"\n💾 [STEP 10] Stored cache for node {self.id}")
             
             if self.agent_type == "intermediate":
                 print(f"   ⏭️  [{self.role}] Cache generated, no text output")
