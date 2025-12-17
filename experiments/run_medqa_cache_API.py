@@ -67,6 +67,8 @@ def parse_args():
                         help='Generation mode: api_hint (API with text hint), hybrid (local+API), local (local only)')
     parser.add_argument('--hidden_dim', type=int, default=4096)
     parser.add_argument('--num_cache_layers', type=int, default=32)
+    parser.add_argument('--latent_only', action='store_true', help='Keep only latent tokens (LatentMAS-style)')
+    parser.add_argument('--latent_steps', type=int, default=10, help='Number of latent reasoning steps')
     parser.add_argument('--question_id', type=int, default=None, help='Run specific question by index (0-based)')
     
     args = parser.parse_args()
@@ -131,9 +133,13 @@ async def main():
             max_tokens = 2048 if is_final else 1024  # Final: 2048, Intermediate: 512
             node_kwargs.append({
                 "generation_mode": args.generation_mode,
-                "max_new_tokens": max_tokens
+                "max_new_tokens": max_tokens,
+                "latent_only": args.latent_only,
+                "latent_steps": args.latent_steps
             })
         print(f"📏 Token limits: Intermediate agents=512, Final agent=2048")
+        if args.latent_only:
+            print(f"✂️  Latent-only mode: Keep only {args.latent_steps} latent tokens per agent")
     else:
         node_kwargs = [{} for _ in agent_names]
     
