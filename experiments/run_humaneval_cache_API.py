@@ -257,10 +257,11 @@ async def main():
             # Execute code with test
             print(f"   🔧 Executing code with test case...")
             try:
-                is_solved, _, error_msg = PyExecutor().execute(code, [test], timeout=100)
+                is_solved, feedback, test_states = PyExecutor().execute(code, [test], timeout=100)
             except Exception as e:
                 is_solved = False
-                error_msg = str(e)
+                feedback = str(e)
+                test_states = (False,)
             
             total_solved += is_solved
             total_executed += 1
@@ -272,7 +273,7 @@ async def main():
             loss_list.append(single_loss)
             
             global_idx = i_batch * args.batch_size + idx
-            print(f"   🔢 Problem ID {global_idx}: Solved={is_solved}, Error={error_msg}")
+            print(f"   🔢 Problem ID {global_idx}: Solved={is_solved}, TestStates={test_states}")
             
             data.append({
                 "Problem_ID": global_idx,
@@ -281,7 +282,8 @@ async def main():
                 "Response": answer,
                 "Extracted_Code": code,
                 "Solved": is_solved,
-                "Error": error_msg,
+                "Feedback": feedback,
+                "TestStates": test_states,
                 "Accuracy": accuracy,
                 "Use Cache": args.use_cache,
                 "Cache Method": args.llm_name if args.use_cache else "None"

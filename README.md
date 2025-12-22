@@ -1330,3 +1330,222 @@ python
 优势 - 代码复用 + 支持多样化agents
 
 你可以把 MathAgentCacheV2 看作是 MathSolverCacheV2 的"多样化版本"，它们功能相同，但支持不同的角色！
+
+
+
+
+# G-Designer（这份代码）的完整计算图（对齐实现）
+
+## 0) 记号
+
+- 节点数：`N`
+- 查询/题目：`q`
+- 每个节点的角色描述 embedding（固定）：`x_i ∈ R^d`
+- 查询 embedding：`e(q) ∈ R^d`
+- 固定 role 先验图：`A_role`（用于 GCN）
+- 固定候选边 mask：`M ∈ {0,1}^(N×N)`（由 mode 生成，例如 FullConnected/Chain/Star）
+- 采样得到的执行图边：`a_ij ∈ {0,1}`
+
+---
+
+## 1) 前向（可导部分：产生边 logits / 概率）
+
+### (1) 固定节点特征
+
+对每个节点 `i`，先用 role 的 profile 得到 embedding：
+
+```
+x_i = Embed(role_profile_i)
+```
+
+组成矩阵：
+
+```
+X = [x_1; ...; x_N] ∈ R^(N×d)
+```
+
+### (2) 查询特征拼接（每题不同）
+
+```
+e(q) = Embed(q)
+```
+
+复制到每个节点：
+
+```
+E(q) = 1_N ⊗ e(q)^T ∈ R^(N×d)
+```
+
+拼接得到：
+
+```
+X' = [X || E(q)] ∈ R^(N×2d)
+```
+
+（对应代码：`construct_new_features`）
+
+### (3) 固定图上的 GCN 消息传递
+
+```
+H = GCN_θ(X', A_role) ∈ R^(N×d)
+```
+
+（对应代码：`self.gcn(new_features, self.role_adj_matrix)`）
+
+### (4) MLP 映射（注意：代码里用了，但训练脚本默认没更新它）
+
+```
+Z = MLP(H) ∈ R^(N×k)
+```
+
+（对应代码：`logits = self.mlp(logits)`）
+
+### (5) 边打分（两两点积）
+
+```
+S = Z @ Z^T ∈ R^(N×N)
+s_ij = z_i^T @ z_j
+```
+
+（对应代码：`self.spatial_logits = logits @ logits.t()`）
+
+### (6) min-max 归一化到 `[-1,1]`（代码有这一步）
+
+
+```
+
+s̃_ij = 2× \frac{s_ij-\min(S)}{\max(S)-\min(S)} - 1
+
+```
+
+
+（对应代码：`min_max_norm(torch.flatten(...))`）
+
+### (7) 变成概率
+
+
+```
+
+p_ij=σ(s̃_ij/T)
+
+```
+
+
+（对应代码：`edge_prob = sigmoid(edge_logit / temperature)`）
+
+> 到这里全部可导（对 GCN/MLP 参数可导）。
+
+---
+
+## 2) 采样（不可导，但没关系：REINFORCE）
+
+对每条候选边 `(i,j)`：
+
+### (A) mask 约束（决定“这条边是否允许存在”）
+
+- 若 `M_ij=0`：直接跳过（永不出现）
+- 若 `M_ij=1`：才考虑这条边
+
+（对应代码：`if edge_mask == 0.0: continue`）
+
+### (B) 两种模式：是否真的采样
+
+#### 情况 1：`optimized_spatial == False`（默认很多实验是这个）
+
+- mask=1 的边 **直接必连**（只要不造成 cycle）
+- 这时图结构不学习，GCN 输出的 `p_ij` 其实不影响连接
+
+（对应代码：`elif edge_mask==1 and optimized_spatial==False: add_successor`）
+
+#### 情况 2：`optimized_spatial == True`
+
+才会真的进行 Bernoulli 采样：
+
+
+```
+
+a_ij~ Bernoulli(p_ij)
+
+```
+
+
+并且还会做一个 spatial cycle-check（避免有向环）。
+
+---
+
+## 3) 计算 log-prob（关键：梯度从这里回传）
+
+采样到的整张执行图 `G` 的 log 概率（对齐代码）：
+
+对每条“参与采样的边”（mask=1 且 optimized_spatial=True 且通过 cycle check 的边）：
+
+- 如果 `a_ij=1`：加 `log p_ij`
+- 如果 `a_ij=0`：加 `log(1-p_ij)`
+
+所以：
+
+
+```
+
+log π_θ(G)
+=Σ_ij[a_ijlog p_ij+(1-a_ij)log(1-p_ij)]
+
+```
+
+
+（对应代码：`log_probs.append(log(p))` / `log(1-p)`）
+
+> 这一步可导，因为 `p_ij=σ(×)` 可导，`log` 可导。  
+> 采样动作 `a_ij` 不可导，但 REINFORCE 不需要它可导。
+
+---
+
+## 4) 执行图上的多 Agent 推理（不可导）
+
+根据采样得到的 spatial predecessors/successors：
+
+- 拓扑排序执行各节点 `async_execute`
+- 每个节点把 predecessor 的 outputs 拼进 prompt
+- 调用外部 LLM（不可导）生成文本输出
+- decision node 汇总输出最终答案
+
+（对应：`Graph.arun()` topo loop + `Node.get_spatial_info/get_temporal_info` + agent `_async_execute`）
+
+---
+
+## 5) reward（不可导）与 loss（可导到 GNN）
+
+对 GSM8K：
+
+
+```
+
+R=1[parsed_answer=true_answer]∈\{0,1\}
+
+```
+
+
+loss（对齐训练脚本）：
+
+
+```
+
+L(θ)=-R× log π_θ(G)
+
+```
+
+
+- 若答对 `R=1`：推动这次采样到的图更可能再次被采到
+- 若答错 `R=0`：loss=0（这份实现里不更新）
+
+（对应代码：`single_loss = -log_prob * utility`）
+
+---
+
+## 6) 反向传播更新在哪里？更新几次？
+
+每个 batch：
+
+```python
+total_loss.backward()
+optimizer.step()
