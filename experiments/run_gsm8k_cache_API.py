@@ -52,6 +52,9 @@ def parse_args():
     
     # Cache arguments
     parser.add_argument('--use_cache', action='store_true', help='Enable cache')
+    parser.add_argument('--fuse_method', type=str, default='concatenation',
+                        choices=['weighted_sum', 'concatenation'],
+                        help='Cache fusion method: weighted_sum (blend) or concatenation (stack)')
     parser.add_argument('--generation_mode', type=str, default='api_hint',  # Use api_hint to avoid local model collapse 
                         choices=['api_hint', 'hybrid', 'local'],
                         help='Generation mode: api_hint (API with text hint), hybrid (local+API), local (local only)')
@@ -113,14 +116,14 @@ async def main():
     # Setup agents
     if args.use_cache:
         # Option 1: Diverse agents like LatentMAS (Math, Analyst, Code, Inspector)
-        agent_names = ['MathAgentCacheV2', 'AnalystAgentCacheV2', 'CodeAgentCacheV2', 'InspectorAgentCacheV2']
-        decision_method = 'FinalReferCacheV2'  # Use cache-aware decision agent
-        print(f"✅ Using diverse cache-enabled agents: Math, Analyst, Code, Inspector")
+        # agent_names = ['MathAgentCacheV2', 'AnalystAgentCacheV2', 'CodeAgentCacheV2', 'InspectorAgentCacheV2']
+        # decision_method = 'FinalReferCacheV2'  # Use cache-aware decision agent
+        # print(f"✅ Using diverse cache-enabled agents: Math, Analyst, Code, Inspector")
         
         # Option 2: All same agents (uncomment to use)
-        # agent_names = ['MathSolverCacheV2'] * sum(args.agent_nums)
-        # decision_method = 'FinalReferCacheV2'
-        # print(f"✅ Using cache-enabled agents (all Math Solver)")
+        agent_names = ['MathSolverCacheV2'] * sum(args.agent_nums)
+        decision_method = 'FinalReferCacheV2'
+        print(f"✅ Using cache-enabled agents (all Math Solver)")
     else:
         agent_names = ['MathSolver'] * sum(args.agent_nums)
         decision_method = args.decision_method  # Use standard decision method
@@ -175,10 +178,38 @@ async def main():
         use_cache_communication=args.use_cache,
         hidden_dim=args.hidden_dim,
         num_cache_layers=args.num_cache_layers,
+        fuse_method=args.fuse_method,  # NEW: Pass fuse_method
         node_kwargs=node_kwargs,
         decision_kwargs=decision_kwargs,
         **kwargs
     )
+    
+    print(f"\n🔗 Cache fusion method: {args.fuse_method.upper()}")
+    if args.fuse_method == 'weighted_sum':
+        print(f"   ⚖️  Weighted sum: Blend caches with learned weights (sequence length unchanged)")
+    else:
+        print(f"   🔗 Concatenation: Stack caches sequentially (sequence length increases)")
+    
+    # Print role information for each agent
+    print("\n" + "="*80)
+    print("🎭 AGENT ROLES ASSIGNMENT")
+    print("="*80)
+    for node_id, node in graph.nodes.items():
+        print(f"Agent ID: {node_id}")
+        print(f"  - Agent Class: {node.agent_name}")
+        print(f"  - Role: {node.role}")
+        print(f"  - Constraint (first 100 chars): {node.constraint[:100]}...")
+        print()
+    
+    print("\n📊 ROLE CONNECTIONS (from ROLE_CONNECTION):")
+    role_connections = graph.prompt_set.get_role_connection()
+    for i, (from_role, to_role) in enumerate(role_connections, 1):
+        print(f"  {i}. {from_role} → {to_role}")
+    
+    print("\n🔗 ROLE ADJACENCY MATRIX:")
+    print(f"  Shape: {graph.role_adj_matrix.shape}")
+    print(f"  Edge index: {graph.role_adj_matrix}")
+    print("="*80 + "\n")
     
     graph.gcn.train()
     

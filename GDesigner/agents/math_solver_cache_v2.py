@@ -7,6 +7,7 @@ from GDesigner.graph.node import Node
 from GDesigner.agents.agent_registry import AgentRegistry
 from GDesigner.llm.llm_registry import LLMRegistry
 from GDesigner.prompt.prompt_set_registry import PromptSetRegistry
+from GDesigner.tools.coding.python_executor import execute_code_get_return
 
 
 @AgentRegistry.register('MathSolverCacheV2')
@@ -108,7 +109,11 @@ class MathSolverCacheV2(Node):
         - Judger agents: generate_latent_batch() + generate_text_batch() → cache + text
         """
         graph = getattr(self, 'graph', None)
-        print(f"\n🎯 [STEP 3] MathSolverCacheV2._async_execute() - Agent: {self.id}, Type: {self.agent_type}")
+        print(f"\n🎯 [STEP 3] MathSolverCacheV2._async_execute()")
+        print(f"   Agent ID: {self.id}")
+        print(f"   Agent Type: {self.agent_type}")
+        print(f"   🎭 Role: {self.role}")
+        print(f"   📋 Constraint (first 80 chars): {self.constraint[:80]}...")
         
         # Step 1: Get fused cache from predecessors
         past_kv = None
@@ -158,11 +163,35 @@ class MathSolverCacheV2(Node):
                 print(f"\n⏭️  [INTERMEDIATE] No text output - cache is the real output")
                 return ""  # Empty output - cache communication is via graph.node_caches, not text
             else:
+                # Execute code if Programming Expert role
+                if self.role == "Programming Expert" and response.strip():
+                    try:
+                        print(f"\n🐍 [CODE EXECUTION] Executing Python code for Programming Expert...")
+                        code = response.lstrip("```python\n").rstrip("\n```")
+                        answer = execute_code_get_return(code)
+                        response += f"\nthe answer is {answer}"
+                        print(f"   ✅ Code executed successfully, answer: {answer}")
+                    except Exception as e:
+                        print(f"   ⚠️ Code execution failed: {e}")
+                        # Keep original response if execution fails
+                
                 print(f"\n✅ [JUDGER] Returning text output: {len(response)} chars")
                 return response
         else:
             # Fallback: text-only
             response = await self.llm.agen(messages)
+            
+            # Execute code if Programming Expert role
+            if self.role == "Programming Expert" and response.strip():
+                try:
+                    print(f"\n🐍 [CODE EXECUTION] Executing Python code for Programming Expert...")
+                    code = response.lstrip("```python\n").rstrip("\n```")
+                    answer = execute_code_get_return(code)
+                    response += f"\nthe answer is {answer}"
+                    print(f"   ✅ Code executed successfully, answer: {answer}")
+                except Exception as e:
+                    print(f"   ⚠️ Code execution failed: {e}")
+            
             return response
     
     @property

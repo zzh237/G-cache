@@ -70,7 +70,10 @@ class DiverseAgentCacheV2(Node):
                             spatial_info: Dict[str, Dict], 
                             temporal_info: Dict[str, Dict]) -> str:
         graph = getattr(self, 'graph', None)
-        print(f"\n🎯 [{self.role}] Agent {self.id} executing (Type: {self.agent_type})")
+        print(f"\n🎯 [{self.role}] Agent {self.id} executing")
+        print(f"   Agent Type: {self.agent_type}")
+        print(f"   🎭 Role: {self.role}")
+        print(f"   📋 Constraint (first 80 chars): {self.constraint[:80]}...")
         
         # Get fused cache from predecessors
         past_kv = None

@@ -60,6 +60,9 @@ def parse_args():
     
     # Cache arguments
     parser.add_argument('--use_cache', action='store_true', help='Enable cache')
+    parser.add_argument('--fuse_method', type=str, default='concatenation',
+                        choices=['weighted_sum', 'concatenation'],
+                        help='Cache fusion method: weighted_sum (blend) or concatenation (stack)')
     parser.add_argument('--generation_mode', type=str, default='api_hint',
                         choices=['api_hint', 'hybrid', 'local'],
                         help='Generation mode: api_hint (API with text hint), hybrid (local+API), local (local only)')
@@ -176,6 +179,7 @@ async def main():
         use_cache_communication=args.use_cache,
         hidden_dim=args.hidden_dim,
         num_cache_layers=args.num_cache_layers,
+        fuse_method=args.fuse_method,
         node_kwargs=node_kwargs,
         **kwargs
     )

@@ -10,10 +10,11 @@ from GDesigner.graph.node import Node
 
 class CacheFuser(nn.Module):
     """Graph-guided cache fusion (supports both tensor and text caches)"""
-    def __init__(self, hidden_dim: int, num_layers: int):
+    def __init__(self, hidden_dim: int, num_layers: int, fuse_method: str = 'weighted_sum'):
         super().__init__()
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
+        self.fuse_method = fuse_method  # 'weighted_sum' or 'concatenation'
         # Learnable fusion weights per layer (for tensor caches)
         self.layer_gates = nn.Parameter(torch.zeros(num_layers))
         self.fusion_weights = nn.Parameter(torch.ones(num_layers))
@@ -25,7 +26,7 @@ class CacheFuser(nn.Module):
         
         # Check cache type: tensor (local model) or dict (API)
         first_cache = sharer_caches[0]
-        print(f"   🔍 Cache type: {type(first_cache).__name__}")
+        print(f"   🔍 Cache type: {type(first_cache).__name__}, Fuse method: {self.fuse_method}")
         
         # Text-based cache (API mode)
         if isinstance(first_cache, dict):
@@ -72,6 +73,55 @@ class CacheFuser(nn.Module):
         # LatentMAS-style: If only one cache, return it directly (no fusion needed)
         if len(sharer_caches) == 1:
             return sharer_caches[0]
+        
+        # Choose fusion method
+        if self.fuse_method == 'concatenation':
+            return self._concatenate_caches(sharer_caches, edge_weights)
+        else:  # weighted_sum (default)
+            return self._weighted_sum_caches(sharer_caches, edge_weights, tau)
+    
+    def _concatenate_caches(self, sharer_caches: List[Tuple], edge_weights: List[float]) -> Tuple:
+        """Concatenate caches along sequence dimension (ordered by edge weight)"""
+        print(f"   🔗 Using CONCATENATION fusion method")
+        
+        # Sort caches by edge weight (descending) to prioritize important predecessors
+        sorted_pairs = sorted(zip(edge_weights, sharer_caches), key=lambda x: x[0], reverse=True)
+        sorted_caches = [cache for _, cache in sorted_pairs]
+        sorted_weights = [w for w, _ in sorted_pairs]
+        
+        print(f"   📊 Concatenation order (by weight): {sorted_weights}")
+        
+        actual_num_layers = len(sorted_caches[0])
+        fused_layers = []
+        
+        for l in range(actual_num_layers):
+            # Concatenate all caches at layer l along sequence dimension
+            keys_to_concat = []
+            values_to_concat = []
+            
+            for cache in sorted_caches:
+                if l >= len(cache):
+                    continue
+                k, v = cache[l]  # (batch, heads, seq, dim)
+                keys_to_concat.append(k)
+                values_to_concat.append(v)
+            
+            if keys_to_concat:
+                # Concatenate along sequence dimension (dim=2)
+                fused_k = torch.cat(keys_to_concat, dim=2)
+                fused_v = torch.cat(values_to_concat, dim=2)
+                fused_layers.append((fused_k, fused_v))
+                
+                if l == 0:  # Print info for first layer
+                    orig_seq_len = keys_to_concat[0].shape[2]
+                    new_seq_len = fused_k.shape[2]
+                    print(f"   📊 Layer 0: {len(keys_to_concat)} caches, seq_len {orig_seq_len} → {new_seq_len}")
+        
+        return tuple(fused_layers) if fused_layers else None
+    
+    def _weighted_sum_caches(self, sharer_caches: List[Tuple], edge_weights: List[float], tau: float) -> Tuple:
+        """Weighted sum of caches (original method)"""
+        print(f"   ⚖️  Using WEIGHTED_SUM fusion method")
         
         # For multiple caches: Check if all have same sequence length
         seq_lengths = [cache[0][0].shape[2] for cache in sharer_caches if len(cache) > 0]
@@ -130,12 +180,14 @@ class CacheGraph(Graph):
     Extends GDesigner Graph with minimal KV-cache fusion capability
     """
     def __init__(self, *args, use_cache_communication: bool = True, 
-                 hidden_dim: int = 4096, num_cache_layers: int = 32, **kwargs):
+                 hidden_dim: int = 4096, num_cache_layers: int = 32, 
+                 fuse_method: str = 'concatenation', **kwargs):
         super().__init__(*args, **kwargs)
         self.use_cache_communication = use_cache_communication
+        self.fuse_method = fuse_method  # 'weighted_sum' or 'concatenation'
         
         if use_cache_communication:
-            self.cache_fuser = CacheFuser(hidden_dim, num_cache_layers)
+            self.cache_fuser = CacheFuser(hidden_dim, num_cache_layers, fuse_method)
             # Store node caches
             self.node_caches: Dict[str, Any] = {}
     
