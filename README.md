@@ -4,6 +4,8 @@ Combines **GDesigner's** graph topology with **LatentMAS's** KV-cache generation
 
 ---
 
+# conda activate /local3/ericjiang/envs/lean_agent
+
 ## 🚀 Quick Start
 
 ```bash
