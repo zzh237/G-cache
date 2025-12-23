@@ -68,6 +68,7 @@ def parse_args():
                         help='Generation mode: api_hint (API with text hint), hybrid (local+API), local (local only)')
     parser.add_argument('--hidden_dim', type=int, default=4096)
     parser.add_argument('--num_cache_layers', type=int, default=32)
+    parser.add_argument('--add_role', action='store_true', help='Keep latent + role context (discard only input)')
     parser.add_argument('--latent_only', action='store_true', help='Keep only latent tokens (LatentMAS-style)')
     parser.add_argument('--latent_steps', type=int, default=10, help='Number of latent reasoning steps')
     parser.add_argument('--question_id', type=int, default=None, help='Run specific question by index (0-based)')
@@ -124,14 +125,14 @@ async def main():
     # Setup agents
     if args.use_cache:
         # Option 1: Diverse science agents (recommended for GPQA)
-        agent_names = ['ScienceExpertCacheV2', 'ScientificAnalystCacheV2', 'CodeAgentCacheV2', 'ResearcherCacheV2']
-        decision_method = 'FinalReferCacheV2'
-        print(f"✅ Using diverse cache-enabled agents: Science Expert, Scientific Analyst, Code, Researcher")
+        # agent_names = ['ScienceExpertCacheV2', 'ScientificAnalystCacheV2', 'CodeAgentCacheV2', 'ResearcherCacheV2']
+        # decision_method = 'FinalReferCacheV2'
+        # print(f"✅ Using diverse cache-enabled agents: Science Expert, Scientific Analyst, Code, Researcher")
         
         # Option 2: Uniform agents (uncomment to use)
-        # agent_names = ['MathSolverCacheV2'] * sum(args.agent_nums)
-        # decision_method = 'FinalReferCacheV2'
-        # print(f"✅ Using cache-enabled agents (all Science Expert)")
+        agent_names = ['MathSolverCacheV2'] * sum(args.agent_nums)
+        decision_method = 'FinalReferCacheV2'
+        print(f"✅ Using cache-enabled agents (all Science Expert)")
     else:
         agent_names = ['MathSolver'] * sum(args.agent_nums)
         decision_method = args.decision_method  # Use standard decision method

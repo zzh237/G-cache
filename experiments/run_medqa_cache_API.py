@@ -71,6 +71,7 @@ def parse_args():
     parser.add_argument('--hidden_dim', type=int, default=4096)
     parser.add_argument('--num_cache_layers', type=int, default=32)
     parser.add_argument('--latent_only', action='store_true', help='Keep only latent tokens (LatentMAS-style)')
+    parser.add_argument('--add_role', action='store_true', help='Keep latent + role context (discard only input)')
     parser.add_argument('--latent_steps', type=int, default=10, help='Number of latent reasoning steps')
     parser.add_argument('--question_id', type=int, default=None, help='Run specific question by index (0-based)')
     
