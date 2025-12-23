@@ -116,18 +116,33 @@ class MathSolverCacheV2(Node):
         """Process inputs with cache-aware prompting"""
         from gcache_data.gsm8k_dataset import gsm_get_predict
         
-        system_prompt = self.constraint
+        # system_prompt = self.constraint
+        system_prompt = f"You are an Agent {self.id} as a {self.role}.\n {self.constraint}"
         user_prompt = self.prompt_set.get_answer_prompt(question=raw_inputs["task"], role=self.role)
         
         # Track token counts for selective cache retention
-        role_str = ""
+        # role_str = ""
         
         # Build spatial/temporal context strings
         context_text = ""
         if self.add_role:
-            role_str += f"You are provided with latent-format information: a previousAgent {self.id} as a {self.role}, it has latent KV representation formated steps to the same question for your reference."
-            if len(role_str):
-                context_part = f"\n\n{role_str}\n\n"
+            # role_str += f"You are an Agent {self.id} as a {self.role}."
+            # if len(role_str):
+            #     context_part = f"\n\n{role_str}\n\n"
+            #     user_prompt += context_part
+            #     context_text += context_part
+
+            for id, info in spatial_info.items():
+                spatial_str += f"Agent {id} as a {info['role']}\n"
+            for id, info in temporal_info.items():
+                temporal_str += f"Agent {id} as a {info['role']}\n"
+            
+            if len(spatial_str):
+                context_part = f"At the same time, you are provided with latent-format information from previous agents, they have latent KV representation formatted steps to the same question for your reference:\n\n{spatial_str}\n\n"
+                user_prompt += context_part
+                context_text += context_part
+            if len(temporal_str):
+                context_part = f"In the last round of dialogue, there were the following latent steps to the same question for your reference:\n\n{temporal_str}"
                 user_prompt += context_part
                 context_text += context_part
         
@@ -142,48 +157,6 @@ class MathSolverCacheV2(Node):
         
         return system_prompt, user_prompt, context_text
     
-    
-    # def _process_inputs(self, raw_inputs: Dict[str, str], 
-    #                    spatial_info: Dict[str, Dict], 
-    #                    temporal_info: Dict[str, Dict],
-    #                    has_cache: bool = False) -> tuple:
-    #     """Process inputs with cache-aware prompting"""
-    #     from gcache_data.gsm8k_dataset import gsm_get_predict
-        
-    #     system_prompt = self.constraint
-    #     user_prompt = self.prompt_set.get_answer_prompt(question=raw_inputs["task"], role=self.role)
-        
-    #     # Track token counts for selective cache retention
-    #     spatial_str = ""
-    #     temporal_str = ""
-        
-    #     # Build spatial/temporal context strings
-    #     context_text = ""
-    #     if self.add_role:
-    #         for id, info in spatial_info.items():
-    #             spatial_str += f"Agent {id} as a {info['role']}\n"
-    #         for id, info in temporal_info.items():
-    #             temporal_str += f"Agent {id} as a {info['role']}\n"
-            
-    #         if len(spatial_str):
-    #             context_part = f"At the same time, there are the following latent steps to the same question for your reference:\n\n{spatial_str}\n\n"
-    #             user_prompt += context_part
-    #             context_text += context_part
-    #         if len(temporal_str):
-    #             context_part = f"In the last round of dialogue, there were the following latent steps to the same question for your reference:\n\n{temporal_str}"
-    #             user_prompt += context_part
-    #             context_text += context_part
-        
-    #     # For intermediate agents in cache mode, minimal text (rely on cache)
-    #     if self.agent_type == "intermediate" and self.cache_mode == "hybrid":
-    #         print(f"   📊 [INTERMEDIATE AGENT] Prompt with spatial/temporal context")
-    #         print(f"   📋 Context length: {len(context_text)} chars")
-        
-    #     # For judger agents, may want more context
-    #     elif self.agent_type == "judger" and self.cache_mode != "text_only":
-    #         print(f"   📊 [JUDGER AGENT] Full prompt with cache support")
-        
-    #     return system_prompt, user_prompt, context_text
     
     def _execute(self, input: Dict[str, str], spatial_info: Dict, temporal_info: Dict):
         """Sync execution (not used in async mode)"""
