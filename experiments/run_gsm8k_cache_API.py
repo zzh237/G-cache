@@ -60,7 +60,8 @@ def parse_args():
                         help='Generation mode: api_hint (API with text hint), hybrid (local+API), local (local only)')
     parser.add_argument('--hidden_dim', type=int, default=4096)
     parser.add_argument('--num_cache_layers', type=int, default=32)
-    parser.add_argument('--latent_only', action='store_true', help='Keep only latent tokens (LatentMAS-style)')
+    parser.add_argument('--latent_only', action='store_true', help='Keep only latent tokens (discard input + context)')
+    parser.add_argument('--add_role', action='store_true', help='Keep latent + role context (discard only input)')
     parser.add_argument('--latent_steps', type=int, default=10, help='Number of latent reasoning steps')
     parser.add_argument('--question_id', type=int, default=None, help='Run specific question by index (0-based)')
     
@@ -149,11 +150,16 @@ async def main():
                 "generation_mode": args.generation_mode,
                 "max_new_tokens": max_tokens,
                 "latent_only": args.latent_only,
+                "add_role": args.add_role,
                 "latent_steps": args.latent_steps
             })
         print(f"📏 Token limits: Intermediate agents=512, Final agent=2048")
-        if args.latent_only:
-            print(f"✂️  Latent-only mode: Keep only {args.latent_steps} latent tokens per agent")
+        if args.add_role:
+            print(f"✂️  ADD_ROLE mode: Keep {args.latent_steps} latent + role context tokens per agent")
+        elif args.latent_only:
+            print(f"✂️  LATENT_ONLY mode: Keep only {args.latent_steps} latent tokens per agent")
+        else:
+            print(f"💾 FULL mode: Keep all tokens (input + context + latent)")
         
         # Decision agent kwargs (judger gets more tokens)
         decision_kwargs = {
@@ -203,12 +209,37 @@ async def main():
     
     print("\n📊 ROLE CONNECTIONS (from ROLE_CONNECTION):")
     role_connections = graph.prompt_set.get_role_connection()
+    
+    # Create role to node mapping
+    role_to_nodes = {}
+    for node_id, node in graph.nodes.items():
+        role = node.role
+        if role not in role_to_nodes:
+            role_to_nodes[role] = []
+        role_to_nodes[role].append(node_id)
+    
     for i, (from_role, to_role) in enumerate(role_connections, 1):
-        print(f"  {i}. {from_role} → {to_role}")
+        from_nodes = role_to_nodes.get(from_role, [])
+        to_nodes = role_to_nodes.get(to_role, [])
+        from_ids = ", ".join(from_nodes) if from_nodes else "N/A"
+        to_ids = ", ".join(to_nodes) if to_nodes else "N/A"
+        print(f"  {i}. {from_role} ({from_ids}) → {to_role} ({to_ids})")
     
     print("\n🔗 ROLE ADJACENCY MATRIX:")
     print(f"  Shape: {graph.role_adj_matrix.shape}")
     print(f"  Edge index: {graph.role_adj_matrix}")
+    
+    # Print in readable format with node IDs
+    print("\n  📊 Edge List (with Node IDs):")
+    edge_index = graph.role_adj_matrix
+    node_list = list(graph.nodes.keys())
+    for i in range(edge_index.shape[1]):
+        src_idx, dst_idx = edge_index[0, i].item(), edge_index[1, i].item()
+        src_node_id = node_list[src_idx]
+        dst_node_id = node_list[dst_idx]
+        src_role = graph.nodes[src_node_id].role
+        dst_role = graph.nodes[dst_node_id].role
+        print(f"    Edge {i+1}: Node {src_idx} ({src_node_id}, {src_role}) → Node {dst_idx} ({dst_node_id}, {dst_role})")
     print("="*80 + "\n")
     
     graph.gcn.train()
