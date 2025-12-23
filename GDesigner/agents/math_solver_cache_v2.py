@@ -125,7 +125,7 @@ class MathSolverCacheV2(Node):
         # Build spatial/temporal context strings
         context_text = ""
         if self.add_role:
-            role_str += f"Agent {id} as a {self.role}, it has latent steps"
+            role_str += f"Agent {self.id} as a {self.role}, it has latent steps"
             if len(role_str):
                 context_part = f"At the same time, \n\n{role_str}\n\n"
                 user_prompt += context_part
@@ -222,11 +222,6 @@ class MathSolverCacheV2(Node):
         system_prompt, user_prompt, context_text = self._process_inputs(input, spatial_info, temporal_info, has_cache)
         messages = [{'role': 'system', 'content': system_prompt}, {'role': 'user', 'content': user_prompt}]
         
-        # Estimate context token count for smart truncation
-        context_token_count = 0
-        if hasattr(self, 'llm') and hasattr(self.llm, 'tokenizer'):
-            context_token_count = len(self.llm.tokenizer.encode(context_text)) if context_text else 0
-            print(f"   📋 Estimated context tokens: {context_token_count}")
         
         # Step 3: Generate with agent-type-aware cache
         if hasattr(self.llm, 'agen_with_cache') and self.cache_mode != "text_only":
@@ -249,6 +244,13 @@ class MathSolverCacheV2(Node):
                     if self.add_role:
                         # Mode 1: Keep latent + role context, discard input
                         print(f"\n✂️  [ADD_ROLE MODE] Keeping latent + context, discarding input question")
+                        # Estimate context token count for smart truncation
+                        context_token_count = 0
+                        if hasattr(self, 'llm') and hasattr(self.llm, 'tokenizer'):
+                            context_token_count = len(self.llm.tokenizer.encode(context_text)) if context_text else 0
+                            print(f"   📋 Estimated context tokens: {context_token_count}")
+                        
+                        
                         kv_cache = self._truncate_past_smart(
                             kv_cache, 
                             latent_tokens=self.latent_steps,
