@@ -62,8 +62,13 @@ class FinalReferCacheV2(Node):
         # # If no text outputs, add a note
         # if not spatial_str.strip():
         #     spatial_str = "[Note: Intermediate agents generated latent cache is used to generate the response]\n\n"
-        # Add concise output instruction
-        user_prompt += "\n\nIMPORTANT: Keep your reasoning concise (under 500 words). Focus on the key steps needed to solve the problem. The last line must contain only the final answer as a letter.\n"
+        # Add strict output format instruction
+        user_prompt += """\n\nCRITICAL INSTRUCTIONS:
+1. Provide a brief analysis (maximum 200 words)
+2. State your final answer clearly
+3. End with EXACTLY this format: "The answer is [LETTER]"
+4. Do NOT use <think> tags or show excessive reasoning
+5. Be direct and concise\n"""
         
         return system_prompt, user_prompt
     
