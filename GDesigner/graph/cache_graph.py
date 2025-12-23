@@ -81,17 +81,14 @@ class CacheFuser(nn.Module):
             return self._weighted_sum_caches(sharer_caches, edge_weights, tau)
     
     def _concatenate_caches(self, sharer_caches: List[Tuple], edge_weights: List[float]) -> Tuple:
-        """Concatenate caches along sequence dimension (ordered by edge weight)"""
-        print(f"   🔗 Using CONCATENATION fusion method")
+        """Concatenate caches along sequence dimension (all weights set to 1)"""
+        print(f"   🔗 Using CONCATENATION fusion method (weights set to 1.0)")
         
-        # Sort caches by edge weight (descending) to prioritize important predecessors
-        sorted_pairs = sorted(zip(edge_weights, sharer_caches), key=lambda x: x[0], reverse=True)
-        sorted_caches = [cache for _, cache in sorted_pairs]
-        sorted_weights = [w for w, _ in sorted_pairs]
+        # For concatenation, treat all caches equally (weight = 1.0)
+        uniform_weights = [1.0] * len(sharer_caches)
+        print(f"   📊 Concatenation weights: {uniform_weights} (uniform)")
         
-        print(f"   📊 Concatenation order (by weight): {sorted_weights}")
-        
-        actual_num_layers = len(sorted_caches[0])
+        actual_num_layers = len(sharer_caches[0])
         fused_layers = []
         
         for l in range(actual_num_layers):
@@ -99,7 +96,7 @@ class CacheFuser(nn.Module):
             keys_to_concat = []
             values_to_concat = []
             
-            for cache in sorted_caches:
+            for cache in sharer_caches:
                 if l >= len(cache):
                     continue
                 k, v = cache[l]  # (batch, heads, seq, dim)
