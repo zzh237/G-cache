@@ -36,7 +36,6 @@ class FinalReferCacheV2(Node):
         system_prompt = f"{self.role}.\n {self.constraint}"
         
         decision_few_shot = self.prompt_set.get_decision_few_shot()
-        # user_prompt = f"{decision_few_shot} The task is:\n\n {raw_inputs['task']}.\n At the same time, the latent information of other agents is as follows:\n\n{spatial_str}"
         user_prompt = f"{decision_few_shot} The task is:\n\n {raw_inputs['task']}.\n"
         context_text = ""
         spatial_str = ""
@@ -54,7 +53,7 @@ class FinalReferCacheV2(Node):
             context_part = f"In the last round of dialogue, there were the following latent steps to the same question for your reference:\n\n{temporal_str}"
             user_prompt += context_part
             context_text += context_part
-
+        
         # for id, info in spatial_info.items():
         #     # Skip empty outputs from intermediate agents (they only generate cache)
         #     if info['output'].strip():
@@ -63,6 +62,9 @@ class FinalReferCacheV2(Node):
         # # If no text outputs, add a note
         # if not spatial_str.strip():
         #     spatial_str = "[Note: Intermediate agents generated latent cache is used to generate the response]\n\n"
+        # Add concise output instruction
+        user_prompt += "\n\nIMPORTANT: Keep your reasoning concise (under 500 words). Focus on the key steps needed to solve the problem. The last line must contain only the final answer as a letter.\n"
+        
         return system_prompt, user_prompt
     
     def _execute(self, input: Dict[str, str], spatial_info: Dict[str, Any], 
