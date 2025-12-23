@@ -125,6 +125,8 @@ class MathSolverCacheV2(Node):
         
         # Build spatial/temporal context strings
         context_text = ""
+        spatial_str = ""
+        temporal_str = ""
         if self.add_role:
             # role_str += f"You are an Agent {self.id} as a {self.role}."
             # if len(role_str):
