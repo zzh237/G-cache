@@ -184,7 +184,57 @@ async def main():
         node_kwargs=node_kwargs,
         **kwargs
     )
+    print(f"\n🔗 Cache fusion method: {args.fuse_method.upper()}")
+    if args.fuse_method == 'weighted_sum':
+        print(f"   ⚖️  Weighted sum: Blend caches with learned weights (sequence length unchanged)")
+    else:
+        print(f"   🔗 Concatenation: Stack caches sequentially (sequence length increases)")
     
+    # Print role information for each agent
+    print("\n" + "="*80)
+    print("🎭 AGENT ROLES ASSIGNMENT")
+    print("="*80)
+    for node_id, node in graph.nodes.items():
+        print(f"Agent ID: {node_id}")
+        print(f"  - Agent Class: {node.agent_name}")
+        print(f"  - Role: {node.role}")
+        print(f"  - Constraint (first 100 chars): {node.constraint[:100]}...")
+        print()
+    
+    print("\n📊 ROLE CONNECTIONS (from ROLE_CONNECTION):")
+    role_connections = graph.prompt_set.get_role_connection()
+    
+    # Create role to node mapping
+    role_to_nodes = {}
+    for node_id, node in graph.nodes.items():
+        role = node.role
+        if role not in role_to_nodes:
+            role_to_nodes[role] = []
+        role_to_nodes[role].append(node_id)
+    
+    for i, (from_role, to_role) in enumerate(role_connections, 1):
+        from_nodes = role_to_nodes.get(from_role, [])
+        to_nodes = role_to_nodes.get(to_role, [])
+        from_ids = ", ".join(from_nodes) if from_nodes else "N/A"
+        to_ids = ", ".join(to_nodes) if to_nodes else "N/A"
+        print(f"  {i}. {from_role} ({from_ids}) → {to_role} ({to_ids})")
+    
+    print("\n🔗 ROLE ADJACENCY MATRIX:")
+    print(f"  Shape: {graph.role_adj_matrix.shape}")
+    print(f"  Edge index: {graph.role_adj_matrix}")
+    
+    # Print in readable format with node IDs
+    print("\n  📊 Edge List (with Node IDs):")
+    edge_index = graph.role_adj_matrix
+    node_list = list(graph.nodes.keys())
+    for i in range(edge_index.shape[1]):
+        src_idx, dst_idx = edge_index[0, i].item(), edge_index[1, i].item()
+        src_node_id = node_list[src_idx]
+        dst_node_id = node_list[dst_idx]
+        src_role = graph.nodes[src_node_id].role
+        dst_role = graph.nodes[dst_node_id].role
+        print(f"    Edge {i+1}: Node {src_idx} ({src_node_id}, {src_role}) → Node {dst_idx} ({dst_node_id}, {dst_role})")
+    print("="*80 + "\n")
     graph.gcn.train()
     
     # Optimizer
