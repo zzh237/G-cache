@@ -172,7 +172,7 @@ async def main():
         # Decision agent kwargs (judger gets more tokens)
         decision_kwargs = {
             "generation_mode": args.generation_mode,
-            "max_new_tokens": 3072
+            "max_new_tokens": 4096  # Increased for longer reasoning
         }
     else:
         node_kwargs = [{} for _ in agent_names]
