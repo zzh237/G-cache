@@ -46,7 +46,7 @@ class FinalReferCacheV2(Node):
             spatial_str = "[Note: Intermediate agents generated latent cache is used to generate the response]\n\n"
         
         decision_few_shot = self.prompt_set.get_decision_few_shot()
-        user_prompt = f"{decision_few_shot} The task is:\n\n {raw_inputs['task']}.\n At the same time, the output of other agents is as follows:\n\n{spatial_str}"
+        user_prompt = f"{decision_few_shot} The task is:\n\n {raw_inputs['task']}.\n At the same time, the latent information of other agents is as follows:\n\n{spatial_str}"
         
         return system_prompt, user_prompt
     

@@ -125,9 +125,9 @@ class MathSolverCacheV2(Node):
         # Build spatial/temporal context strings
         context_text = ""
         if self.add_role:
-            role_str += f"Agent {self.id} as a {self.role}, it has latent steps"
+            role_str += f"You are provided with latent-format information: a previousAgent {self.id} as a {self.role}, it has latent KV representation formated steps to the same question for your reference."
             if len(role_str):
-                context_part = f"At the same time, \n\n{role_str}\n\n"
+                context_part = f"\n\n{role_str}\n\n"
                 user_prompt += context_part
                 context_text += context_part
         
@@ -241,25 +241,25 @@ class MathSolverCacheV2(Node):
             if kv_cache is not None:
                 original_len = kv_cache[0][0].shape[2]       
                 if self.latent_only:
-                    if self.add_role:
-                        # Mode 1: Keep latent + role context, discard input
-                        print(f"\n✂️  [ADD_ROLE MODE] Keeping latent + context, discarding input question")
-                        # Estimate context token count for smart truncation
-                        context_token_count = 0
-                        if hasattr(self, 'llm') and hasattr(self.llm, 'tokenizer'):
-                            context_token_count = len(self.llm.tokenizer.encode(context_text)) if context_text else 0
-                            print(f"   📋 Estimated context tokens: {context_token_count}")
+                    # if self.add_role:
+                    #     # Mode 1: Keep latent + role context, discard input
+                    #     print(f"\n✂️  [ADD_ROLE MODE] Keeping latent + context, discarding input question")
+                    #     # Estimate context token count for smart truncation
+                    #     context_token_count = 0
+                    #     if hasattr(self, 'llm') and hasattr(self.llm, 'tokenizer'):
+                    #         context_token_count = len(self.llm.tokenizer.encode(context_text)) if context_text else 0
+                    #         print(f"   📋 Estimated context tokens: {context_token_count}")
                         
                         
-                        kv_cache = self._truncate_past_smart(
-                            kv_cache, 
-                            latent_tokens=self.latent_steps,
-                            context_tokens=context_token_count,
-                            total_tokens=original_len
-                        )
-                        new_len = kv_cache[0][0].shape[2] if kv_cache else 0
-                        print(f"   📊 Cache: {original_len} → {new_len} tokens (latent + context)")
-                    else:
+                    #     kv_cache = self._truncate_past_smart(
+                    #         kv_cache, 
+                    #         latent_tokens=self.latent_steps,
+                    #         context_tokens=context_token_count,
+                    #         total_tokens=original_len
+                    #     )
+                    #     new_len = kv_cache[0][0].shape[2] if kv_cache else 0
+                    #     print(f"   📊 Cache: {original_len} → {new_len} tokens (latent + context)")
+                    # else:
                         # Mode 2: Keep only latent, discard input + context
                         print(f"\n✂️  [LATENT_ONLY MODE] Keeping only {self.latent_steps} latent tokens")
                         kv_cache = self._truncate_past(kv_cache, self.latent_steps)
