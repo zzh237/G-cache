@@ -35,6 +35,10 @@ class FinalReferCacheV2(Node):
         self.constraint = self.prompt_set.get_decision_constraint()          
         system_prompt = f"{self.role}.\n {self.constraint}"
         
+        decision_few_shot = self.prompt_set.get_decision_few_shot()
+        # user_prompt = f"{decision_few_shot} The task is:\n\n {raw_inputs['task']}.\n At the same time, the latent information of other agents is as follows:\n\n{spatial_str}"
+        user_prompt = f"{decision_few_shot} The task is:\n\n {raw_inputs['task']}.\n"
+        context_text = ""
         spatial_str = ""
         temporal_str = ""
         for id, info in spatial_info.items():
@@ -59,10 +63,6 @@ class FinalReferCacheV2(Node):
         # # If no text outputs, add a note
         # if not spatial_str.strip():
         #     spatial_str = "[Note: Intermediate agents generated latent cache is used to generate the response]\n\n"
-        
-        decision_few_shot = self.prompt_set.get_decision_few_shot()
-        user_prompt = f"{decision_few_shot} The task is:\n\n {raw_inputs['task']}.\n At the same time, the latent information of other agents is as follows:\n\n{spatial_str}"
-        
         return system_prompt, user_prompt
     
     def _execute(self, input: Dict[str, str], spatial_info: Dict[str, Any], 
