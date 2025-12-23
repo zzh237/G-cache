@@ -120,23 +120,14 @@ class MathSolverCacheV2(Node):
         user_prompt = self.prompt_set.get_answer_prompt(question=raw_inputs["task"], role=self.role)
         
         # Track token counts for selective cache retention
-        spatial_str = ""
-        temporal_str = ""
+        role_str = ""
         
         # Build spatial/temporal context strings
         context_text = ""
         if self.add_role:
-            for id, info in spatial_info.items():
-                spatial_str += f"Agent {id} as a {info['role']}\n"
-            for id, info in temporal_info.items():
-                temporal_str += f"Agent {id} as a {info['role']}\n"
-            
-            if len(spatial_str):
-                context_part = f"At the same time, there are the following latent steps to the same question for your reference:\n\n{spatial_str}\n\n"
-                user_prompt += context_part
-                context_text += context_part
-            if len(temporal_str):
-                context_part = f"In the last round of dialogue, there were the following latent steps to the same question for your reference:\n\n{temporal_str}"
+            role_str += f"Agent {id} as a {self.role}, it has latent steps"
+            if len(role_str):
+                context_part = f"At the same time, \n\n{role_str}\n\n"
                 user_prompt += context_part
                 context_text += context_part
         
@@ -150,6 +141,49 @@ class MathSolverCacheV2(Node):
             print(f"   📊 [JUDGER AGENT] Full prompt with cache support")
         
         return system_prompt, user_prompt, context_text
+    
+    
+    # def _process_inputs(self, raw_inputs: Dict[str, str], 
+    #                    spatial_info: Dict[str, Dict], 
+    #                    temporal_info: Dict[str, Dict],
+    #                    has_cache: bool = False) -> tuple:
+    #     """Process inputs with cache-aware prompting"""
+    #     from gcache_data.gsm8k_dataset import gsm_get_predict
+        
+    #     system_prompt = self.constraint
+    #     user_prompt = self.prompt_set.get_answer_prompt(question=raw_inputs["task"], role=self.role)
+        
+    #     # Track token counts for selective cache retention
+    #     spatial_str = ""
+    #     temporal_str = ""
+        
+    #     # Build spatial/temporal context strings
+    #     context_text = ""
+    #     if self.add_role:
+    #         for id, info in spatial_info.items():
+    #             spatial_str += f"Agent {id} as a {info['role']}\n"
+    #         for id, info in temporal_info.items():
+    #             temporal_str += f"Agent {id} as a {info['role']}\n"
+            
+    #         if len(spatial_str):
+    #             context_part = f"At the same time, there are the following latent steps to the same question for your reference:\n\n{spatial_str}\n\n"
+    #             user_prompt += context_part
+    #             context_text += context_part
+    #         if len(temporal_str):
+    #             context_part = f"In the last round of dialogue, there were the following latent steps to the same question for your reference:\n\n{temporal_str}"
+    #             user_prompt += context_part
+    #             context_text += context_part
+        
+    #     # For intermediate agents in cache mode, minimal text (rely on cache)
+    #     if self.agent_type == "intermediate" and self.cache_mode == "hybrid":
+    #         print(f"   📊 [INTERMEDIATE AGENT] Prompt with spatial/temporal context")
+    #         print(f"   📋 Context length: {len(context_text)} chars")
+        
+    #     # For judger agents, may want more context
+    #     elif self.agent_type == "judger" and self.cache_mode != "text_only":
+    #         print(f"   📊 [JUDGER AGENT] Full prompt with cache support")
+        
+    #     return system_prompt, user_prompt, context_text
     
     def _execute(self, input: Dict[str, str], spatial_info: Dict, temporal_info: Dict):
         """Sync execution (not used in async mode)"""
@@ -210,26 +244,25 @@ class MathSolverCacheV2(Node):
             
             # Step 4: Truncate cache based on mode
             if kv_cache is not None:
-                original_len = kv_cache[0][0].shape[2]
-                
-                if self.add_role:
-                    # Mode 1: Keep latent + role context, discard input
-                    print(f"\n✂️  [ADD_ROLE MODE] Keeping latent + context, discarding input question")
-                    kv_cache = self._truncate_past_smart(
-                        kv_cache, 
-                        latent_tokens=self.latent_steps,
-                        context_tokens=context_token_count,
-                        total_tokens=original_len
-                    )
-                    new_len = kv_cache[0][0].shape[2] if kv_cache else 0
-                    print(f"   📊 Cache: {original_len} → {new_len} tokens (latent + context)")
-                    
-                elif self.latent_only:
-                    # Mode 2: Keep only latent, discard input + context
-                    print(f"\n✂️  [LATENT_ONLY MODE] Keeping only {self.latent_steps} latent tokens")
-                    kv_cache = self._truncate_past(kv_cache, self.latent_steps)
-                    new_len = kv_cache[0][0].shape[2] if kv_cache else 0
-                    print(f"   📊 Cache: {original_len} → {new_len} tokens (latent only)")
+                original_len = kv_cache[0][0].shape[2]       
+                if self.latent_only:
+                    if self.add_role:
+                        # Mode 1: Keep latent + role context, discard input
+                        print(f"\n✂️  [ADD_ROLE MODE] Keeping latent + context, discarding input question")
+                        kv_cache = self._truncate_past_smart(
+                            kv_cache, 
+                            latent_tokens=self.latent_steps,
+                            context_tokens=context_token_count,
+                            total_tokens=original_len
+                        )
+                        new_len = kv_cache[0][0].shape[2] if kv_cache else 0
+                        print(f"   📊 Cache: {original_len} → {new_len} tokens (latent + context)")
+                    else:
+                        # Mode 2: Keep only latent, discard input + context
+                        print(f"\n✂️  [LATENT_ONLY MODE] Keeping only {self.latent_steps} latent tokens")
+                        kv_cache = self._truncate_past(kv_cache, self.latent_steps)
+                        new_len = kv_cache[0][0].shape[2] if kv_cache else 0
+                        print(f"   📊 Cache: {original_len} → {new_len} tokens (latent only)")
                 
                 # Mode 3: Keep everything (no truncation) - default
             
