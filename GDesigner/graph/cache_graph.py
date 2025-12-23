@@ -243,30 +243,23 @@ class CacheGraph(Graph):
         print(f"\n   📊 Collected {len(sharer_caches)} caches from predecessors")
         print(f"      • Raw edge_weights: {edge_weights}")
         
-        # Normalize edge weights
-        total_weight = sum(edge_weights)
-        edge_weights = [w / total_weight for w in edge_weights]
-        normed = [(pid, cache, w/total_weight) for pid, cache, w in collected]
-        print(f"      • Normalized edge_weights: {edge_weights} (sum={sum(edge_weights):.2f})")
+        # For concatenation, use uniform weights (no normalization)
+        if self.fuse_method == 'concatenation':
+            edge_weights = [1.0] * len(edge_weights)
+            print(f"      • Concatenation mode: weights set to {edge_weights}")
+        else:
+            # Normalize edge weights for weighted_sum
+            total_weight = sum(edge_weights)
+            edge_weights = [w / total_weight for w in edge_weights]
+            print(f"      • Normalized edge_weights: {edge_weights} (sum={sum(edge_weights):.2f})")
         
         # Fuse caches using learnable fusion
         print(f"   🧪 Fusing {len(sharer_caches)} caches with weights {edge_weights}")
-        # print(f"   📊 Cache fusion breakdown (BEFORE fusion):")
-        # for i, pred in enumerate(node.spatial_predecessors):
-        #     if pred.id in self.node_caches and self.node_caches[pred.id]:
-        #         cache = self.node_caches[pred.id]
-        #         if isinstance(cache, tuple):
-        #             k_shape = cache[0][0].shape
-        #             v_shape = cache[0][1].shape
-        #             print(f"      - Cache {i+1} from {pred.id}: weight={edge_weights[i]:.2f}")
-        #             print(f"        Key shape: {k_shape}, Value shape: {v_shape}")
-        #         else:
-        #             print(f"      - Cache {i+1} from {pred.id}: weight={edge_weights[i]:.2f}, layers={len(cache)}")
         print(f"   🔍 [DIMENSIONS] Before cache_fuser call:")
         print(f"      • sharer_caches: list of {len(sharer_caches)} caches")
-        for i, (pid, cache, w) in enumerate(normed):
+        for i, (pid, cache, w) in enumerate(collected):
             k_shape, v_shape = cache[0][0].shape, cache[0][1].shape
-            print(f"  - Cache {i+1} from {pid}: lenght={len(cache)} weight={w:.2f}")
+            print(f"  - Cache {i+1} from {pid}: length={len(cache)} weight={edge_weights[i]:.2f}")
             print(f"    Key shape: {k_shape}, Value shape: {v_shape}")
 
 
