@@ -153,25 +153,37 @@ async def main():
         node_kwargs = []
         for i, _ in enumerate(agent_names):
             is_final = (i == len(agent_names) - 1)  # Last agent before FinalRefer
-            max_tokens = 2048 if is_final else 1024  # Final: 2048, Intermediate: 1024 (GPQA needs more reasoning)
+            max_tokens = 2048 if is_final else 512  # Final: 2048, Intermediate: 512
             node_kwargs.append({
                 "generation_mode": args.generation_mode,
                 "max_new_tokens": max_tokens,
                 "latent_only": args.latent_only,
+                "add_role": args.add_role,
                 "latent_steps": args.latent_steps
             })
-        print(f"📏 Token limits: Intermediate agents=1024, Final agent=2048")
-        if args.latent_only:
-            print(f"✂️  Latent-only mode: Keep only {args.latent_steps} latent tokens per agent")
+        print(f"📏 Token limits: Intermediate agents=512, Final agent=2048")
+        if args.add_role:
+            print(f"✂️  ADD_ROLE mode: Keep {args.latent_steps} latent + role context tokens per agent")
+        elif args.latent_only:
+            print(f"✂️  LATENT_ONLY mode: Keep only {args.latent_steps} latent tokens per agent")
+        else:
+            print(f"💾 FULL mode: Keep all tokens (input + context + latent)")
+        
+        # Decision agent kwargs (judger gets more tokens)
+        decision_kwargs = {
+            "generation_mode": args.generation_mode,
+            "max_new_tokens": 2048
+        }
     else:
         node_kwargs = [{} for _ in agent_names]
+        decision_kwargs = {}
     
     # Remove node_kwargs from kwargs if it exists to avoid duplicate
     kwargs.pop('node_kwargs', None)
     
     # Create CacheGraph
     graph = CacheGraph(
-        domain="gpqa",  # Use GPQA-specific prompts
+        domain="gpqa",
         llm_name=args.llm_name,
         agent_names=agent_names,
         decision_method=decision_method,
@@ -180,10 +192,12 @@ async def main():
         use_cache_communication=args.use_cache,
         hidden_dim=args.hidden_dim,
         num_cache_layers=args.num_cache_layers,
-        fuse_method=args.fuse_method,
+        fuse_method=args.fuse_method,  # NEW: Pass fuse_method
         node_kwargs=node_kwargs,
+        decision_kwargs=decision_kwargs,
         **kwargs
     )
+    
     print(f"\n🔗 Cache fusion method: {args.fuse_method.upper()}")
     if args.fuse_method == 'weighted_sum':
         print(f"   ⚖️  Weighted sum: Blend caches with learned weights (sequence length unchanged)")
