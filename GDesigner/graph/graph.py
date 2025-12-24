@@ -265,12 +265,15 @@ class Graph(ABC):
     def clear_spatial_connection(self):
         """
         Clear all the spatial connection of the nodes in the graph.
+        Note: Does NOT clear decision_node connections (managed by connect_decision_node)
         """
         for node_id in self.nodes.keys():
             self.nodes[node_id].spatial_predecessors = []
             self.nodes[node_id].spatial_successors = []
-        self.decision_node.spatial_predecessors = []
-        self.decision_node.spatial_successors = []
+        # Decision node connections are managed separately by connect_decision_node()
+        # Do NOT clear them here to preserve connections across rounds
+        # self.decision_node.spatial_predecessors = []
+        # self.decision_node.spatial_successors = []
     
     def clear_temporal_connection(self):
         """
@@ -281,7 +284,16 @@ class Graph(ABC):
             self.nodes[node_id].temporal_successors = []
 
     def connect_decision_node(self):
+        """Connect all graph nodes to the decision node (idempotent)"""
+        # Clear existing connections to avoid duplicates
+        self.decision_node.spatial_predecessors = []
         for node_id in self.nodes.keys():
+            # Remove decision_node from successors if already present
+            self.nodes[node_id].spatial_successors = [
+                s for s in self.nodes[node_id].spatial_successors 
+                if s.id != self.decision_node.id
+            ]
+            # Add decision_node as successor
             self.nodes[node_id].add_successor(self.decision_node)
 
     def construct_spatial_connection(self, temperature: float = 1.0, threshold: float = None,): # temperature must >= 1.0
