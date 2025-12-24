@@ -1832,3 +1832,262 @@ log P(图G) = log P(边1) + log P(边2) + ... + log P(边N)
 
 所以必须遍历所有边，才能正确计算整个图结构的概率！
 
+
+
+
+"""
+详细解释 construct_spatial_connection 的遍历过程
+"""
+
+print("=" * 80)
+print("construct_spatial_connection 遍历过程详解")
+print("=" * 80)
+
+print("""
+问题：这里的 loss 是遍历每一个节点吗？检查每一个节点有没有 edge？
+
+答案：不是遍历节点，而是遍历所有可能的边（edge）！
+""")
+
+print("\n" + "=" * 80)
+print("1. potential_spatial_edges 的构建")
+print("=" * 80)
+
+print("""
+在 init_potential_edges() 中：
+
+```python
+def init_potential_edges(self):
+    for node1_id in self.nodes.keys():
+        for node2_id in self.nodes.keys():
+            self.potential_spatial_edges.append([node1_id, node2_id])
+```
+
+假设有 4 个节点：node_0, node_1, node_2, node_3
+
+potential_spatial_edges 包含所有可能的边（包括自连接）：
+  [node_0, node_0]  # 0 → 0 (自连接)
+  [node_0, node_1]  # 0 → 1
+  [node_0, node_2]  # 0 → 2
+  [node_0, node_3]  # 0 → 3
+  [node_1, node_0]  # 1 → 0
+  [node_1, node_1]  # 1 → 1 (自连接)
+  [node_1, node_2]  # 1 → 2
+  [node_1, node_3]  # 1 → 3
+  [node_2, node_0]  # 2 → 0
+  [node_2, node_1]  # 2 → 1
+  [node_2, node_2]  # 2 → 2 (自连接)
+  [node_2, node_3]  # 2 → 3
+  [node_3, node_0]  # 3 → 0
+  [node_3, node_1]  # 3 → 1
+  [node_3, node_2]  # 3 → 2
+  [node_3, node_3]  # 3 → 3 (自连接)
+
+总共：4 × 4 = 16 条可能的边
+""")
+
+print("\n" + "=" * 80)
+print("2. construct_spatial_connection 的遍历")
+print("=" * 80)
+
+print("""
+遍历的是边（edge），不是节点（node）！
+
+```python
+for potential_connection, edge_logit, edge_mask in zip(
+    self.potential_spatial_edges,  # 所有可能的边
+    self.spatial_logits,            # 每条边的 logit
+    self.spatial_masks              # 每条边的 mask
+):
+    out_node = self.find_node(potential_connection[0])  # 边的起点
+    in_node = self.find_node(potential_connection[1])   # 边的终点
+    
+    # 检查这条边是否应该被采样
+    ...
+```
+
+每次循环处理一条边，而不是一个节点！
+""")
+
+print("\n" + "=" * 80)
+print("3. 详细的遍历示例")
+print("=" * 80)
+
+print("""
+假设 4 个节点，遍历 16 条边：
+
+迭代 | 边 (out → in)  | edge_mask | 处理
+-----|----------------|-----------|------
+ 0   | node_0 → node_0 |    0.0    | SKIP (自连接)
+ 1   | node_0 → node_1 |    1.0    | 采样决策
+ 2   | node_0 → node_2 |    1.0    | 采样决策
+ 3   | node_0 → node_3 |    1.0    | 采样决策
+ 4   | node_1 → node_0 |    1.0    | 采样决策
+ 5   | node_1 → node_1 |    0.0    | SKIP (自连接)
+ 6   | node_1 → node_2 |    1.0    | 采样决策
+ 7   | node_1 → node_3 |    1.0    | 采样决策
+ 8   | node_2 → node_0 |    1.0    | 采样决策
+ 9   | node_2 → node_1 |    1.0    | 采样决策
+10   | node_2 → node_2 |    0.0    | SKIP (自连接)
+11   | node_2 → node_3 |    1.0    | 采样决策
+12   | node_3 → node_0 |    1.0    | 采样决策
+13   | node_3 → node_1 |    1.0    | 采样决策
+14   | node_3 → node_2 |    1.0    | 采样决策
+15   | node_3 → node_3 |    0.0    | SKIP (自连接)
+
+每条边都会被检查一次！
+""")
+
+print("\n" + "=" * 80)
+print("4. 每条边的处理逻辑")
+print("=" * 80)
+
+print("""
+对于每条边 (out_node → in_node)：
+
+步骤 1: 检查 edge_mask
+  if edge_mask == 0.0:
+      continue  # 跳过这条边（如自连接）
+
+步骤 2: 检查是否优化
+  elif edge_mask == 1.0 and self.optimized_spatial == False:
+      # 不优化模式：直接添加边
+      out_node.add_successor(in_node, 'spatial')
+      continue
+
+步骤 3: 采样决策（优化模式）
+  edge_prob = torch.sigmoid(edge_logit / temperature)
+  
+  if torch.rand(1) < edge_prob:
+      # 采样成功：添加这条边
+      out_node.add_successor(in_node, 'spatial')
+      log_probs.append(torch.log(edge_prob))
+  else:
+      # 采样失败：不添加这条边
+      log_probs.append(torch.log(1 - edge_prob))
+""")
+
+print("\n" + "=" * 80)
+print("5. log_probs 的累积")
+print("=" * 80)
+
+print("""
+log_probs 记录了所有边的采样概率：
+
+初始：log_probs = [0.0]
+
+遍历边：
+  边 0 (0→0): SKIP (不添加到 log_probs)
+  边 1 (0→1): 未采样 → log_probs.append(log(1-0.277)) = -0.324
+  边 2 (0→2): 采样到 → log_probs.append(log(0.321)) = -1.136
+  边 3 (0→3): 采样到 → log_probs.append(log(0.491)) = -0.711
+  边 4 (1→0): 未采样 → log_probs.append(log(1-0.277)) = -0.324
+  边 5 (1→1): SKIP
+  边 6 (1→2): 未采样 → log_probs.append(log(1-0.468)) = -0.631
+  ...
+
+最后：return torch.sum(torch.stack(log_probs))
+     = 0.0 + (-0.324) + (-1.136) + (-0.711) + ... = -6.31
+""")
+
+print("\n" + "=" * 80)
+print("6. 关键理解")
+print("=" * 80)
+
+print("""
+✓ 遍历的是边（edge），不是节点（node）
+  - 4 个节点 → 16 条可能的边（4×4）
+  - N 个节点 → N² 条可能的边
+
+✓ 每条边都要做决策
+  - 采样到：添加边，记录 log(prob)
+  - 未采样：不添加边，记录 log(1-prob)
+  - 跳过：mask=0，不记录
+
+✓ log_probs 是所有边的联合概率
+  - 表示"选择这个图结构"的总概率
+  - 用于 REINFORCE 算法的梯度计算
+
+✓ 每个节点可能有多条出边
+  - node_0 可能连到 node_1, node_2, node_3
+  - 每条边独立采样
+""")
+
+print("\n" + "=" * 80)
+print("7. 可视化示例")
+print("=" * 80)
+
+print("""
+假设采样结果：
+
+节点关系：
+  node_0 → node_2 ✓ (采样到)
+  node_0 → node_3 ✓ (采样到)
+  node_1 → node_2 ✗ (未采样)
+  node_2 → node_3 ✗ (未采样)
+  node_3 → node_0 ✓ (采样到)
+
+图结构：
+    ┌─────┐
+    │  0  │──┐
+    └──▲──┘  │
+       │     │
+       │     ▼
+    ┌──┴──┐ ┌─────┐
+    │  3  │ │  2  │
+    └─────┘ └─────┘
+       ▲       ▲
+       │       │
+       └───────┘
+         (from 0)
+
+每条边都被检查了，但只有部分被采样到！
+""")
+
+print("\n" + "=" * 80)
+print("总结")
+print("=" * 80)
+
+print("""
+问：遍历每一个节点吗？
+答：不是！遍历的是每一条可能的边（edge）
+
+问：检查每一个节点有没有 edge？
+答：不是！检查的是每一条边是否应该被采样
+
+关键点：
+1. 遍历对象：边（edge），不是节点（node）
+2. 遍历数量：N² 条边（N 是节点数）
+3. 每条边：独立采样，独立贡献 log_prob
+4. 最终：所有边的 log_prob 求和
+""")
+
+
+
+
+# 1. edge_logit 来自 spatial_logits
+spatial_logits_matrix = logits @ logits.t()  # [4, 4] 对称矩阵
+# 例如：
+# [[a, b, c, d],
+#  [b, e, f, g],
+#  [c, f, h, i],
+#  [d, g, i, j]]
+
+self.spatial_logits = flatten(spatial_logits_matrix)  # [16]
+# [a, b, c, d, b, e, f, g, c, f, h, i, d, g, i, j]
+
+# 在 construct_spatial_connection 中:
+for edge_logit in self.spatial_logits:
+    # edge_logit 就是每条边的 logit 值
+    edge_prob = sigmoid(edge_logit)
+    # 采样...
+
+# 2. optimized_spatial 默认值
+# Graph.__init__: optimized_spatial = False (默认)
+# run_gpqa_cache_API.py: --optimized_spatial default=True (你的设置)
+
+# 所以在你的实验中，optimized_spatial = True
+# 这意味着：
+# - spatial_logits 的 requires_grad = True
+# - 会通过梯度下降优化边的选择
+# - 用于学习最优的图结构

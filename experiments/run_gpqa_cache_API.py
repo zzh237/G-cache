@@ -24,7 +24,7 @@ from typing import List
 
 from GDesigner.utils.const import GDesigner_ROOT
 from GDesigner.graph.cache_graph import CacheGraph
-from GDesigner.utils.globals import Time
+from GDesigner.utils.globals import Time, Cost, PromptTokens, CompletionTokens
 from run_gsm8k import load_result, dataloader, get_kwargs
 
 # Import from local gcache_data folder
@@ -331,7 +331,7 @@ async def main():
             loss_list.append(single_loss)
             
             global_idx = i_batch * args.batch_size + idx
-            print(f"   🔢 Question ID {global_idx}: Predicted={predict_answer}, Expected={true_answer}, Solved={is_solved}")
+            print(f"   🔢 Question ID {global_idx}: Predicted={predict_answer}, Expected={true_answer}, Solved={is_solved}, -log_prob={-log_prob}")
             
             data.append({
                 "Question_ID": global_idx,
@@ -372,6 +372,9 @@ async def main():
         print(f"   📊 Cumulative Accuracy: {accuracy:.4f} ({total_solved}/{total_executed})")
         print(f"   📉 Batch Loss: {total_loss.item():.4f}")
         print(f"   ✅ Batch Solved: {sum(utilities)}/{len(utilities)}")
+        print(f"   💰 Cost: {Cost.instance().value}")
+        print(f"   📝 PromptTokens: {PromptTokens.instance().value}")
+        print(f"   📝 CompletionTokens: {CompletionTokens.instance().value}")
     
     print(f"\n{'='*80}")
     print(f"✅ FINAL RESULTS")
@@ -379,6 +382,9 @@ async def main():
     print(f"Accuracy: {accuracy:.4f}")
     print(f"Solved: {total_solved}/{total_executed}")
     print(f"Results saved to: {result_file}")
+    print(f"💰 Total Cost: {Cost.instance().value}")
+    print(f"📝 Total PromptTokens: {PromptTokens.instance().value}")
+    print(f"📝 Total CompletionTokens: {CompletionTokens.instance().value}")
     print(f"{'='*80}")
     
     # Close logger

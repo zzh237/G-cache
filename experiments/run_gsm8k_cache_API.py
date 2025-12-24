@@ -371,6 +371,9 @@ async def main():
         print(f"   📊 Cumulative Accuracy: {accuracy:.4f} ({total_solved}/{total_executed})")
         print(f"   📉 Batch Loss: {total_loss.item():.4f}")
         print(f"   ✅ Batch Solved: {sum(utilities)}/{len(utilities)}")
+        print(f"   💰 Cost: {Cost.instance().value}")
+        print(f"   📝 PromptTokens: {PromptTokens.instance().value}")
+        print(f"   📝 CompletionTokens: {CompletionTokens.instance().value}")
     
     print(f"\n{'='*80}")
     print(f"✅ FINAL RESULTS")
@@ -378,6 +381,9 @@ async def main():
     print(f"Accuracy: {accuracy:.4f}")
     print(f"Solved: {total_solved}/{total_executed}")
     print(f"Results saved to: {result_file}")
+    print(f"💰 Total Cost: {Cost.instance().value}")
+    print(f"📝 Total PromptTokens: {PromptTokens.instance().value}")
+    print(f"📝 Total CompletionTokens: {CompletionTokens.instance().value}")
     print(f"{'='*80}")
     
     # Close logger
