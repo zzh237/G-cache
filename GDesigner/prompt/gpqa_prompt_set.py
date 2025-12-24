@@ -86,14 +86,19 @@ class GPQAPromptSet(PromptSet):
     @staticmethod
     def get_decision_constraint():
         return (
-        "You will be given a scientific question and analysis from other agents. "
-        "Please find the most reliable answer based on the analysis and results of other agents. "
-        "Give reasons for making decisions. "
-        "The last line of your output contains only the final answer as a letter, for example: The answer is C")
+        "You will be given a scientific question and latent reasoning steps from other agents (stored in KV cache format). "
+        "The other agents have NOT provided explicit answers - only their reasoning is available through the cache. "
+        "Your task is to synthesize their reasoning and determine the most reliable answer. "
+        "\n\nCRITICAL OUTPUT FORMAT - Use this EXACT structure:\n"
+        "<think>\n"
+        "[Your brief reasoning here - maximum 300 words]\n"
+        "</think>\n"
+        "The answer is [LETTER]\n\n"
+        "Do NOT write anything after 'The answer is [LETTER]'.")
     
     @staticmethod
     def get_decision_role():
-        return "You are the top decision-maker. Good at analyzing and summarizing scientific problems, judging and summarizing other people's solutions, and giving final answers."
+        return "You are the top decision-maker. Good at synthesizing latent reasoning from multiple agents and determining the final answer to scientific problems."
     
     @staticmethod
     def get_decision_few_shot():

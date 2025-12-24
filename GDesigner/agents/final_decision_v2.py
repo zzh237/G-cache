@@ -69,14 +69,14 @@ class FinalReferCacheV2(Node):
 # 3. End with EXACTLY this format: "The answer is [LETTER]"
 # 4. Do NOT use <think> tags or show excessive reasoning
 # 5. Be direct and concise\n"""
-        user_prompt += """\n\nCRITICAL OUTPUT FORMAT:
-Use this EXACT structure:
-<think>
-[Your brief reasoning here - maximum 300 words]
-</think>
-The answer is [LETTER]
+#         user_prompt += """\n\nCRITICAL OUTPUT FORMAT:
+# Use this EXACT structure:
+# <think>
+# [Your brief reasoning here - maximum 300 words]
+# </think>
+# The answer is [LETTER]
 
-Do NOT write anything after "The answer is [LETTER]".\n"""
+# Do NOT write anything after "The answer is [LETTER]".\n"""
         
         return system_prompt, user_prompt
     
