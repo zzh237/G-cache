@@ -358,8 +358,8 @@ class HybridCacheModel:
         
         # Print all decoded texts
         print(f"   ✅ [TO_TEXT] {agent_label} Generated {len(generations[0])} characters using cache tensors")
-        print(f"   📝 [TO_TEXT] {agent_label} INPUT TEXT ({len(input_texts[0])} chars): {input_texts[0][:20000]}...") if len(input_texts[0]) > 20000 else print(f"   📝 [TO_TEXT] {agent_label} INPUT TEXT: {input_texts[0]}")
-        print(f"   📝 [TO_TEXT] {agent_label} OUTPUT TEXT: {generations[0][:40000]}...") if len(generations[0]) > 40000 else print(f"   📝 [TO_TEXT] {agent_label} OUTPUT TEXT: {generations[0]}")
+        print(f"   📝 [TO_TEXT] {agent_label} INPUT TEXT: {input_texts[0]}")
+        print(f"   📝 [TO_TEXT] {agent_label} OUTPUT TEXT: {generations[0]}")
         print(f"   📝 [TO_TEXT] generation finished")
         
         return generations, outputs.past_key_values
