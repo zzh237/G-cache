@@ -451,6 +451,19 @@ class HybridCacheModel:
         
         text = response.choices[0].message.content
         print(f"   ✅ [TEXT_TO_API] Received response: {len(text)} characters")
+        
+        # Update token usage statistics
+        if hasattr(response, 'usage') and response.usage:
+            from GDesigner.utils.globals import Cost, PromptTokens, CompletionTokens
+            prompt_tokens = response.usage.prompt_tokens
+            completion_tokens = response.usage.completion_tokens
+            PromptTokens.instance().value += prompt_tokens
+            CompletionTokens.instance().value += completion_tokens
+            # Estimate cost for Qwen API (approximate pricing)
+            cost = (prompt_tokens * 0.0005 + completion_tokens * 0.002) / 1000
+            Cost.instance().value += cost
+            print(f"   💰 [API] Tokens: prompt={prompt_tokens}, completion={completion_tokens}, cost=${cost:.6f}")
+        
         # print(f"   📝 [API] Response preview: {text[:150]}...")
         return [text], None
     

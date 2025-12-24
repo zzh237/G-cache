@@ -12,7 +12,7 @@ Combines **GDesigner's** graph topology with **LatentMAS's** KV-cache generation
 cd experiments
 
 # Hybrid mode (RECOMMENDED) - small GPU + free API
-python run_gsm8k_cache_API.py --llm_name hybrid_cache_v2 --use_cache --generation_mode hybrid --latent_only --add_role
+CUDA_VISIBLE_DEVICES=2 python run_gsm8k_cache_API.py --llm_name hybrid_cache_v2 --use_cache --generation_mode hybrid --latent_only --add_role 
 ```
 
 ---
