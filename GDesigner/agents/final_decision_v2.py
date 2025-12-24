@@ -142,15 +142,15 @@ class FinalReferCacheV2(Node):
                 graph.store_node_cache(self.id, kv_cache)
                 print(f"\n💾 [STEP 11.5] Stored cache for judger node {self.id}")
             
-            print(f"\n✅ [STEP 11.6] Judger decision complete: {len(response)} chars")
-            print(f"\n📝 [STEP 11.7] Full conversation context for Agent {self.id}:")
-            print(f"   ========== SYSTEM PROMPT ==========")
-            print(f"   {system_prompt}")
-            print(f"   ========== USER PROMPT ==========")
-            print(f"   {user_prompt[:10000]}...") if len(user_prompt) > 10000 else print(f"   {user_prompt}")
-            print(f"   ========== AGENT RESPONSE ==========")
-            print(f"   {response}")
-            print(f"   ====================================")
+            print(f"\n✅ [STEP 11.6] Judger Agent {self.id} decision complete: {len(response)} chars")
+            # print(f"\n📝 [STEP 11.7] Full conversation context for Agent {self.id}:")
+            # print(f"   ========== SYSTEM PROMPT ==========")
+            # print(f"   {system_prompt}")
+            # print(f"   ========== USER PROMPT ==========")
+            # print(f"   {user_prompt[:10000]}...") if len(user_prompt) > 10000 else print(f"   {user_prompt}")
+            # print(f"   ========== AGENT RESPONSE ==========")
+            # print(f"   {response}")
+            # print(f"   ====================================")
             return response
         else:
             # Fallback: text-only

@@ -507,5 +507,5 @@ class HybridCacheModel:
         )
         print(f"   📝 [TO_TEXT-API] {agent_label} Generated text preview: {api_text[0][:10000]}...") if len(api_text[0]) > 10000 else print(f"   📝 [NEW_RESPONSES] {agent_label} Generated text preview: {api_text[0]}")
         
-        print(f"   ✅ [TO_TEXT-API] Complete! Local cache used + API refined")
+        print(f"   ✅ [TO_TEXT-API] {agent_label} Complete! Local cache used + API refined")
         return api_text, new_cache  # Best of both worlds!

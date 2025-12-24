@@ -314,7 +314,7 @@ async def main():
         
         print(f"\n📊 [STEP 14] Processing results and computing metrics...")
         for idx, (task, answer, log_prob, true_answer) in enumerate(zip(current_batch, raw_answers, log_probs, answers)):
-            print(f"\n🔍 [DEBUG] Extracting answer from Task {idx+1} response {str(answer[0])}...")
+            # print(f"\n🔍 [DEBUG] Extracting answer from Task {idx+1} response {str(answer[0])}...")
             extracted = extract_gpqa_answer(answer[0])
             predict_answer = normalize_answer(extracted) if extracted else None
             print(f"   Extracted: '{predict_answer}', Expected: '{true_answer}'")
