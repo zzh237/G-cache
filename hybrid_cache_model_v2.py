@@ -318,9 +318,6 @@ class HybridCacheModel:
             output_scores=False,
             past_key_values=past_key_values,
             cache_position=cache_position,
-            # Stop generation after answer
-            stop_strings=["The answer is A", "The answer is B", "The answer is C", "The answer is D"],
-            tokenizer=self.tokenizer,
         )
         print(f"\n   📐 [TO_TEXT:OUTPUT] Output dimensions from model.generate():")
         input_seq_len = input_ids.shape[1]
@@ -358,6 +355,22 @@ class HybridCacheModel:
             # Decode generated tokens
             generated_ids = sequences[idx, length:]
             text = self.tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
+            
+            # Extract answer after </think> tag if present
+            if '</think>' in text:
+                # Get everything after </think>
+                parts = text.split('</think>')
+                if len(parts) > 1:
+                    text = parts[-1].strip()
+            
+            # Truncate after answer if present
+            for answer_pattern in ["The answer is A", "The answer is B", "The answer is C", "The answer is D"]:
+                if answer_pattern in text:
+                    # Find the position and cut after the answer
+                    pos = text.find(answer_pattern)
+                    text = text[:pos + len(answer_pattern)]
+                    break
+            
             generations.append(text)
         
         # Print all decoded texts
