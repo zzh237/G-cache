@@ -318,6 +318,8 @@ class HybridCacheModel:
             output_scores=False,
             past_key_values=past_key_values,
             cache_position=cache_position,
+            # Stop after generating answer (not in think tag)
+            # This helps ensure model outputs the answer after </think>
         )
         print(f"\n   📐 [TO_TEXT:OUTPUT] Output dimensions from model.generate():")
         input_seq_len = input_ids.shape[1]
