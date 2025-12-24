@@ -350,7 +350,9 @@ async def main():
         # Backprop
         if loss_list:
             total_loss = torch.mean(torch.stack(loss_list))
+            print(f"\n 📉 [STEP 15] Total loss for batch: {total_loss.item():.4f}")
             if args.use_cache and total_loss.requires_grad:
+                print(f"args.use_cache: {args.use_cache}, total_loss.requires_grad: {total_loss.requires_grad}")
                 try:
                     optimizer.zero_grad()
                     total_loss.backward()
@@ -358,7 +360,10 @@ async def main():
                     optimizer.step()
                 except RuntimeError as e:
                     print(f"   ⚠️ Backprop error: {e}")
+            else:
+                print(f"   ⚠️ Skipping backprop: Cache not used or loss does not require grad")
         else:
+            print(f"   ⚠️ No losses computed for this batch, skipping backprop, setting total_loss to 0")
             total_loss = torch.tensor(0.0)
         
         print(f"\n📊 [BATCH/UPDATE {i_batch}] Summary:")
