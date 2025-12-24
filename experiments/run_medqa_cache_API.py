@@ -247,6 +247,23 @@ async def main():
         params += list(graph.cache_fuser.parameters())
     optimizer = torch.optim.Adam(params, lr=args.lr)
     
+    # 📊 Record initial parameters for tracking updates
+    print(f"\n📊 PARAMETER INITIALIZATION")
+    print(f"="*80)
+    initial_params = {}
+    param_names = []
+    for name, param in graph.gcn.named_parameters():
+        initial_params[f"gcn.{name}"] = param.data.clone()
+        param_names.append(f"gcn.{name}")
+        print(f"  GCN.{name}: shape={param.shape}, norm={param.data.norm().item():.6f}")
+    if args.use_cache:
+        for name, param in graph.cache_fuser.named_parameters():
+            initial_params[f"fuser.{name}"] = param.data.clone()
+            param_names.append(f"fuser.{name}")
+            print(f"  CacheFuser.{name}: shape={param.shape}, norm={param.data.norm().item():.6f}")
+    print(f"  Total trainable parameters: {len(param_names)}")
+    print(f"="*80)
+    
     # Handle single question mode
     if args.question_id is not None:
         print(f"\n🎯 Running single question mode: Question ID {args.question_id}")

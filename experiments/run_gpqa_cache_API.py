@@ -257,6 +257,23 @@ async def main():
         params += list(graph.cache_fuser.parameters())
     optimizer = torch.optim.Adam(params, lr=args.lr)
     
+    # 📊 Record initial parameters for tracking updates
+    print(f"\n📊 PARAMETER INITIALIZATION")
+    print(f"="*80)
+    initial_params = {}
+    param_names = []
+    for name, param in graph.gcn.named_parameters():
+        initial_params[f"gcn.{name}"] = param.data.clone()
+        param_names.append(f"gcn.{name}")
+        print(f"  GCN.{name}: shape={param.shape}, norm={param.data.norm().item():.6f}")
+    if args.use_cache:
+        for name, param in graph.cache_fuser.named_parameters():
+            initial_params[f"fuser.{name}"] = param.data.clone()
+            param_names.append(f"fuser.{name}")
+            print(f"  CacheFuser.{name}: shape={param.shape}, norm={param.data.norm().item():.6f}")
+    print(f"  Total trainable parameters: {len(param_names)}")
+    print(f"="*80)
+    
     # Handle single question mode
     if args.question_id is not None:
         print(f"\n🎯 Running single question mode: Question ID {args.question_id}")
@@ -351,21 +368,68 @@ async def main():
         # Backprop
         if loss_list:
             total_loss = torch.mean(torch.stack(loss_list))
-            print(f"\n 📉 [STEP 15] Total loss for batch: {total_loss.item():.4f}")
-            if args.use_cache and total_loss.requires_grad:
-                print(f"args.use_cache: {args.use_cache}, total_loss.requires_grad: {total_loss.requires_grad}")
+            print(f"\n📉 [LOSS] Total loss computed: {total_loss.item():.4f}, requires_grad: {total_loss.requires_grad}")
+            if args.optimized_spatial or args.optimized_temporal:
+                print(f"\n🔧 [OPTIMIZATION] Performing gradient update...")
+                print(f"   📍 Spatial optimization: {args.optimized_spatial}")
+                print(f"   ⏰ Temporal optimization: {args.optimized_temporal}")
                 try:
                     optimizer.zero_grad()
                     total_loss.backward()
+                    
+                    # 📊 Calculate and report gradient norms
+                    print(f"\n   📊 GRADIENT NORMS:")
+                    total_grad_norm = 0.0
+                    for name, param in graph.gcn.named_parameters():
+                        if param.grad is not None:
+                            grad_norm = param.grad.data.norm().item()
+                            total_grad_norm += grad_norm ** 2
+                            print(f"      GCN.{name}: {grad_norm:.6f}")
+                    if args.use_cache:
+                        for name, param in graph.cache_fuser.named_parameters():
+                            if param.grad is not None:
+                                grad_norm = param.grad.data.norm().item()
+                                total_grad_norm += grad_norm ** 2
+                                print(f"      CacheFuser.{name}: {grad_norm:.6f}")
+                    total_grad_norm = total_grad_norm ** 0.5
+                    print(f"      ✅ Total gradient norm (before clipping): {total_grad_norm:.6f}")
+                    
+                    # Clip gradients
                     torch.nn.utils.clip_grad_norm_(params, max_norm=1.0)
+                    
+                    # Calculate gradient norm after clipping
+                    clipped_grad_norm = sum(p.grad.data.norm().item() ** 2 for p in params if p.grad is not None) ** 0.5
+                    print(f"      ✂️ Total gradient norm (after clipping): {clipped_grad_norm:.6f}")
+                    
+                    # Update parameters
                     optimizer.step()
+                    
+                    # 📊 Calculate and report parameter changes
+                    print(f"\n   🔄 PARAMETER UPDATES:")
+                    for name, param in graph.gcn.named_parameters():
+                        param_name = f"gcn.{name}"
+                        if param_name in initial_params:
+                            param_change = (param.data - initial_params[param_name]).norm().item()
+                            param_norm = param.data.norm().item()
+                            relative_change = param_change / (param_norm + 1e-8) * 100
+                            print(f"      GCN.{name}: Δ={param_change:.6f}, norm={param_norm:.6f}, Δ%={relative_change:.4f}%")
+                    if args.use_cache:
+                        for name, param in graph.cache_fuser.named_parameters():
+                            param_name = f"fuser.{name}"
+                            if param_name in initial_params:
+                                param_change = (param.data - initial_params[param_name]).norm().item()
+                                param_norm = param.data.norm().item()
+                                relative_change = param_change / (param_norm + 1e-8) * 100
+                                print(f"      CacheFuser.{name}: Δ={param_change:.6f}, norm={param_norm:.6f}, Δ%={relative_change:.4f}%")
+                    
+                    print(f"   ✅ Optimization step completed")
                 except RuntimeError as e:
                     print(f"   ⚠️ Backprop error: {e}")
             else:
-                print(f"   ⚠️ Skipping backprop: Cache not used or loss does not require grad")
+                print(f"\n⏭️  [NO OPTIMIZATION] Skipping gradient update (optimized_spatial={args.optimized_spatial}, optimized_temporal={args.optimized_temporal})")
         else:
-            print(f"   ⚠️ No losses computed for this batch, skipping backprop, setting total_loss to 0")
             total_loss = torch.tensor(0.0)
+            print(f"\n⚠️  [NO LOSS] No loss computed, skipping optimization")
         
         print(f"\n📊 [BATCH/UPDATE {i_batch}] Summary:")
         print(f"   ⏱️  Batch time: {time.time() - start_ts:.3f}s")
