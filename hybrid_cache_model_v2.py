@@ -313,10 +313,14 @@ class HybridCacheModel:
             top_p=top_p,
             do_sample=True,
             pad_token_id=self.tokenizer.pad_token_id,
+            eos_token_id=self.tokenizer.eos_token_id,
             return_dict_in_generate=True,
             output_scores=False,
             past_key_values=past_key_values,
-            cache_position=cache_position,  # ← FIX: Tell model where new tokens go!
+            cache_position=cache_position,
+            # Stop generation after answer
+            stop_strings=["The answer is A", "The answer is B", "The answer is C", "The answer is D"],
+            tokenizer=self.tokenizer,
         )
         print(f"\n   📐 [TO_TEXT:OUTPUT] Output dimensions from model.generate():")
         input_seq_len = input_ids.shape[1]
