@@ -395,6 +395,10 @@ class Graph(ABC):
             log_probs += self.construct_spatial_connection()
             log_probs += self.construct_temporal_connection(round)
             
+            # Print sampled graph structure on last round
+            if round == num_rounds - 1:
+                self.print_sampled_graph_structure()
+            
             in_degree = {node_id: len(node.spatial_predecessors) for node_id, node in self.nodes.items()}
             zero_in_degree_queue = [node_id for node_id, deg in in_degree.items() if deg == 0]
 
@@ -436,6 +440,43 @@ class Graph(ABC):
                 return True
         return False
 
+    def print_sampled_graph_structure(self):
+        """Print the current sampled graph structure (after construct_spatial_connection)"""
+        print("\n" + "="*80)
+        print("📊 SAMPLED GRAPH STRUCTURE")
+        print("="*80)
+        
+        # Build edge list from current spatial_successors
+        edges = []
+        node_list = list(self.nodes.keys())
+        for i, src_id in enumerate(node_list):
+            src_node = self.nodes[src_id]
+            for successor in src_node.spatial_successors:
+                if successor.id in self.nodes:
+                    j = node_list.index(successor.id)
+                    edges.append((i, j, src_id, successor.id))
+        
+        if len(edges) == 0:
+            print("⚠️  No edges in sampled graph")
+            print("="*80 + "\n")
+            return
+        
+        # Create edge_index tensor
+        src_indices = [e[0] for e in edges]
+        dst_indices = [e[1] for e in edges]
+        edge_index = torch.tensor([src_indices, dst_indices])
+        
+        print(f"  Shape: {edge_index.shape}")
+        print(f"  Edge index: {edge_index}")
+        
+        print("\n  📊 Edge List (with Node IDs):")
+        for idx, (src_idx, dst_idx, src_id, dst_id) in enumerate(edges, 1):
+            src_role = self.nodes[src_id].role
+            dst_role = self.nodes[dst_id].role
+            print(f"    Edge {idx}: Node {src_idx} ({src_id}, {src_role}) → Node {dst_idx} ({dst_id}, {dst_role})")
+        
+        print("="*80 + "\n")
+    
     def update_masks(self, pruning_rate: float) -> torch.Tensor:
         if self.optimized_spatial:
             num_edges = (self.spatial_masks > 0).sum()
