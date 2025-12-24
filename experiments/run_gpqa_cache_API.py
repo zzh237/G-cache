@@ -267,6 +267,7 @@ async def main():
         num_batches = 1
     else:
         num_batches = min(int(len(dataset) / args.batch_size), args.num_iterations)
+        print(f"\n the length of dataset: {len(dataset)}, the args.batch_size: {args.batch_size}, the args.num_iterations: {args.num_iterations}, the num_batches: {num_batches}")
     
     total_solved, total_executed = 0, 0
     
