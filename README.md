@@ -32,7 +32,7 @@ python run_gsm8k_cache_API.py --llm_name hybrid_cache_v2 --use_cache --generatio
 **GPQA (Graduate-Level Science)**
 ```bash
 cd experiments
-python run_gpqa_cache_API.py --llm_name hybrid_cache_v2 --use_cache --generation_mode hybrid --latent_only --latent_steps 10
+CUDA_VISIBLE_DEVICES=2 python run_gpqa_cache_API.py --llm_name hybrid_cache_v2 --use_cache --generation_mode hybrid --latent_only --latent_steps 10
 ```
 
 **MedQA (Medical Q&A)**
