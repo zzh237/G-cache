@@ -90,11 +90,11 @@ class GPQAPromptSet(PromptSet):
         "The other agents have NOT provided explicit answers - only their reasoning is available through the cache. "
         "Your task is to synthesize their reasoning and determine the most reliable answer. "
         "\n\nCRITICAL OUTPUT FORMAT - Use this EXACT structure:\n"
-        "<think>\n"
-        "[Your brief reasoning here - maximum 300 words]\n"
-        "</think>\n"
         "The answer is [LETTER]\n\n"
-        "Do NOT write anything after 'The answer is [LETTER]'.")
+        "<think>\n"
+        "[Optional: Your brief reasoning here - maximum 200 words]\n"
+        "</think>\n\n"
+        "IMPORTANT: Start with 'The answer is [LETTER]' FIRST, then optionally provide reasoning in <think> tags.")
     
     @staticmethod
     def get_decision_role():
