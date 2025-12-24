@@ -57,6 +57,7 @@ def parse_args():
     parser.add_argument('--agent_nums', nargs='+', type=int, default=[4])
     parser.add_argument('--decision_method', type=str, default='FinalRefer')
     parser.add_argument('--optimized_spatial', type=bool, default=True, help='Enable spatial optimization (required for cache training)')
+    parser.add_argument('--optimized_temporal', type=bool, default=False, help='Enable temporal optimization')
     
     # Cache arguments
     parser.add_argument('--use_cache', action='store_true', help='Enable cache')
@@ -372,6 +373,7 @@ async def main():
             if args.optimized_spatial or args.optimized_temporal:
                 print(f"\n🔧 [OPTIMIZATION] Performing gradient update...")
                 print(f"   📍 Spatial optimization: {args.optimized_spatial}")
+                print(f"   ⏰ Temporal optimization: {args.optimized_temporal}")
                 print(f"   ⏰ Temporal optimization: {args.optimized_temporal}")
                 try:
                     optimizer.zero_grad()

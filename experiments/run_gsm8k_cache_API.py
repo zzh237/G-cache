@@ -49,7 +49,7 @@ def parse_args():
     parser.add_argument('--agent_nums', nargs='+', type=int, default=[4])
     parser.add_argument('--decision_method', type=str, default='FinalRefer')
     parser.add_argument('--optimized_spatial', type=bool, default=True, help='Enable spatial optimization (required for cache training)')
-    
+    parser.add_argument('--optimized_temporal', type=bool, default=False, help='Enable temporal optimization')
     # Cache arguments
     parser.add_argument('--use_cache', action='store_true', help='Enable cache')
     parser.add_argument('--fuse_method', type=str, default='concatenation',

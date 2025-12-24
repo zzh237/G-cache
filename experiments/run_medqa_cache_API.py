@@ -59,7 +59,7 @@ def parse_args():
     parser.add_argument('--agent_nums', nargs='+', type=int, default=[4])
     parser.add_argument('--decision_method', type=str, default='FinalRefer')
     parser.add_argument('--optimized_spatial', type=bool, default=True, help='Enable spatial optimization (required for cache training)')
-    
+    parser.add_argument('--optimized_temporal', type=bool, default=False, help='Enable temporal optimization')
     # Cache arguments
     parser.add_argument('--use_cache', action='store_true', help='Enable cache')
     parser.add_argument('--fuse_method', type=str, default='concatenation',
@@ -361,8 +361,26 @@ async def main():
                 try:
                     optimizer.zero_grad()
                     total_loss.backward()
+                    
+                    # 📊 Calculate and report gradient norms
+                    print(f"\n   📊 GRADIENT NORMS:")
+                    total_grad_norm = sum(p.grad.data.norm().item() ** 2 for p in params if p.grad is not None) ** 0.5
+                    print(f"      ✅ Total gradient norm (before clipping): {total_grad_norm:.6f}")
+                    
                     torch.nn.utils.clip_grad_norm_(params, max_norm=1.0)
+                    clipped_grad_norm = sum(p.grad.data.norm().item() ** 2 for p in params if p.grad is not None) ** 0.5
+                    print(f"      ✂️ Total gradient norm (after clipping): {clipped_grad_norm:.6f}")
+                    
                     optimizer.step()
+                    
+                    # 📊 Calculate parameter changes
+                    print(f"\n   🔄 PARAMETER UPDATES:")
+                    for name, param in graph.gcn.named_parameters():
+                        param_name = f"gcn.{name}"
+                        if param_name in initial_params:
+                            param_change = (param.data - initial_params[param_name]).norm().item()
+                            print(f"      GCN.{name}: Δ={param_change:.6f}")
+                    print(f"   ✅ Optimization completed")
                 except RuntimeError as e:
                     print(f"   ⚠️ Backprop error: {e}")
         else:
