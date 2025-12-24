@@ -89,9 +89,13 @@ class GPQAPromptSet(PromptSet):
         "You will be given a scientific question and latent reasoning steps from other agents (stored in KV cache format). "
         "The other agents have NOT provided explicit answers - only their reasoning is available through the cache. "
         "Your task is to synthesize their reasoning and determine the most reliable answer. "
-        "Put your reasoning steps in <think>...</think>."
-        "Put the answer in the last line as: The answer is [Answer]\n\n"
-        "Do NOT write anything after 'The answer is [Answer].")
+        "\n\nCRITICAL OUTPUT FORMAT - Use this EXACT structure:\n"
+        "<think>\n"
+        "[Your brief reasoning here - maximum 300 words]\n"
+        "</think>\n"
+        "The answer is [LETTER]\n\n"
+        "Do NOT write anything after 'The answer is [LETTER]'.")
+    
     
     @staticmethod
     def get_decision_role():

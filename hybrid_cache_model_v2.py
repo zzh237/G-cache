@@ -360,20 +360,20 @@ class HybridCacheModel:
             
             # Keep the full output (answer + reasoning)
             # No truncation needed since answer comes first
-                        # Extract answer after </think> tag if present
+            # Extract answer after </think> tag if present
             # if '</think>' in text:
             #     # Get everything after </think>
             #     parts = text.split('</think>')
             #     if len(parts) > 1:
             #         text = parts[-1].strip()
             
-            # # Truncate after answer if present
-            # for answer_pattern in ["The answer is A", "The answer is B", "The answer is C", "The answer is D"]:
-            #     if answer_pattern in text:
-            #         # Find the position and cut after the answer
-            #         pos = text.find(answer_pattern)
-            #         text = text[:pos + len(answer_pattern)]
-            #         break
+            # Truncate after answer if present
+            for answer_pattern in ["The answer is A", "The answer is B", "The answer is C", "The answer is D"]:
+                if answer_pattern in text:
+                    # Find the position and cut after the answer
+                    pos = text.find(answer_pattern)
+                    text = text[:pos + len(answer_pattern)]
+                    break
 
 
 
